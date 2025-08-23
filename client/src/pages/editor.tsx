@@ -275,6 +275,13 @@ export default function AudioEditor() {
       );
       
       // Convert to WAV and download
+      console.log('Export: Rendered buffer info', {
+        channels: renderedBuffer.numberOfChannels,
+        sampleRate: renderedBuffer.sampleRate,
+        length: renderedBuffer.length,
+        duration: renderedBuffer.length / renderedBuffer.sampleRate
+      });
+
       const wavBlob = AudioConcatenator.audioBufferToWavBlob(renderedBuffer);
       AudioConcatenator.downloadBlob(wavBlob, `${settings.fileName}.${settings.format}`);
       

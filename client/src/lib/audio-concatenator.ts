@@ -36,6 +36,13 @@ export class AudioConcatenator {
    * Konwertuje AudioBuffer do formatu WAV Blob
    */
   static audioBufferToWavBlob(buffer: AudioBuffer): Blob {
+    console.log('WAV Export: Converting buffer', {
+      channels: buffer.numberOfChannels,
+      sampleRate: buffer.sampleRate,
+      length: buffer.length,
+      duration: buffer.length / buffer.sampleRate
+    });
+
     const numberOfChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
     const format = 1; // PCM format
@@ -46,6 +53,14 @@ export class AudioConcatenator {
     const byteRate = sampleRate * blockAlign;
     const dataSize = buffer.length * blockAlign;
     const bufferSize = 44 + dataSize; // WAV header is 44 bytes
+
+    console.log('WAV Export: Header info', {
+      bytesPerSample,
+      blockAlign,
+      byteRate,
+      dataSize,
+      bufferSize
+    });
 
     const arrayBuffer = new ArrayBuffer(bufferSize);
     const view = new DataView(arrayBuffer);
@@ -82,19 +97,44 @@ export class AudioConcatenator {
     // Subchunk2Size
     view.setUint32(offset, dataSize, true); offset += 4;
 
+    // Check for audio data issues
+    let hasAudio = false;
+    let maxSample = 0;
+    let minSample = 0;
+
     // Convert and write audio data
     for (let i = 0; i < buffer.length; i++) {
       for (let channel = 0; channel < numberOfChannels; channel++) {
         const channelData = buffer.getChannelData(channel);
         // Convert float [-1, 1] to 16-bit signed integer
         const sample = Math.max(-1, Math.min(1, channelData[i]));
+        
+        // Track audio stats
+        if (Math.abs(sample) > 0.001) hasAudio = true;
+        maxSample = Math.max(maxSample, sample);
+        minSample = Math.min(minSample, sample);
+        
         const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
         view.setInt16(offset, intSample, true);
         offset += 2;
       }
     }
 
-    return new Blob([arrayBuffer], { type: 'audio/wav' });
+    console.log('WAV Export: Audio stats', {
+      hasAudio,
+      maxSample,
+      minSample,
+      finalOffset: offset,
+      expectedSize: bufferSize
+    });
+
+    const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
+    console.log('WAV Export: Created blob', {
+      size: blob.size,
+      type: blob.type
+    });
+
+    return blob;
   }
 
   /**
@@ -230,7 +270,7 @@ export class AudioConcatenator {
           
           // Apply fade in
           if (clip.fadeIn && clip.fadeIn > 0 && clipTime < clip.fadeIn) {
-            const fadeProgress = clipTime / clip.fadeIn;
+            const fadeProgress = Math.max(0, Math.min(1, clipTime / clip.fadeIn));
             sampleVolume *= fadeProgress;
           }
           
@@ -239,9 +279,14 @@ export class AudioConcatenator {
             const clipDuration = clipDurationSamples / sampleRate;
             const timeFromEnd = clipDuration - clipTime;
             if (timeFromEnd < clip.fadeOut) {
-              const fadeProgress = timeFromEnd / clip.fadeOut;
+              const fadeProgress = Math.max(0, Math.min(1, timeFromEnd / clip.fadeOut));
               sampleVolume *= fadeProgress;
             }
+          }
+          
+          // Validate sample volume
+          if (isNaN(sampleVolume) || !isFinite(sampleVolume)) {
+            sampleVolume = 0;
           }
           
           // Mix the sample (add with volume adjustment)
