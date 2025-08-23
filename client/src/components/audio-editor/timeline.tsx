@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TrackHeader } from '@/components/audio-editor/track-header';
 import { WaveformCanvas } from '@/components/audio-editor/waveform-canvas';
@@ -14,6 +14,7 @@ interface TimelineProps {
   onUpdateClip: (clipId: string, updates: Partial<AudioClip>) => void;
   onDeleteClip: (clipId: string) => void;
   formatTime: (seconds: number) => string;
+  onUpdateProjectData?: (updates: Partial<ProjectData>) => void;
 }
 
 export function Timeline({
@@ -24,23 +25,81 @@ export function Timeline({
   onAddClipToTrack,
   onUpdateClip,
   onDeleteClip,
-  formatTime
+  formatTime,
+  onUpdateProjectData
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const [pixelsPerSecond, setPixelsPerSecond] = useState(100);
+  const timelineContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Use zoomLevel from projectData or default
+  const zoomLevel = projectData.zoomLevel || 100;
+  const pixelsPerSecond = 100 * (zoomLevel / 100);
+  
+  // Mouse drag state for zooming
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [initialZoom, setInitialZoom] = useState(0);
 
-  useEffect(() => {
-    setPixelsPerSecond(100 * (zoomLevel / 100));
-  }, [zoomLevel]);
+  const updateZoom = (newZoom: number) => {
+    const clampedZoom = Math.min(Math.max(newZoom, 25), 800);
+    onUpdateProjectData?.({ zoomLevel: clampedZoom });
+  };
 
   const handleZoomIn = () => {
-    setZoomLevel(prev => Math.min(prev * 1.5, 800));
+    updateZoom(zoomLevel * 1.5);
   };
 
   const handleZoomOut = () => {
-    setZoomLevel(prev => Math.max(prev / 1.5, 25));
+    updateZoom(zoomLevel / 1.5);
   };
+  
+  const handleAutoFit = () => {
+    // Find the longest clip end time
+    const allClips = tracks.flatMap(track => track.clips);
+    if (allClips.length === 0) {
+      updateZoom(100);
+      return;
+    }
+    
+    const maxEndTime = Math.max(...allClips.map(clip => clip.startTime + clip.duration));
+    const containerWidth = timelineContainerRef.current?.clientWidth || 800;
+    const targetPixelsPerSecond = (containerWidth - 200) / maxEndTime; // Leave some margin
+    const newZoom = Math.max(25, Math.min(800, (targetPixelsPerSecond / 100) * 100));
+    updateZoom(newZoom);
+  };
+  
+  // Mouse drag zoom handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.shiftKey) { // Only start drag zoom when Shift is held
+      setIsDragging(true);
+      setDragStartX(e.clientX);
+      setInitialZoom(zoomLevel);
+      e.preventDefault();
+    }
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && e.shiftKey) {
+      const deltaX = e.clientX - dragStartX;
+      const sensitivity = 0.01; // Adjust sensitivity
+      const zoomMultiplier = 1 + (deltaX * sensitivity);
+      const newZoom = initialZoom * zoomMultiplier;
+      updateZoom(newZoom);
+    }
+  };
+  
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+  
+  // Add global mouse up listener when dragging
+  useEffect(() => {
+    if (isDragging) {
+      const handleGlobalMouseUp = () => setIsDragging(false);
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+  }, [isDragging]);
 
   const handleTrackDrop = (e: React.DragEvent, trackId: string) => {
     e.preventDefault();
@@ -127,7 +186,53 @@ export function Timeline({
   const playheadPosition = playbackState.currentTime * pixelsPerSecond;
 
   return (
-    <main className="flex-1 flex flex-col bg-editor-bg">
+    <main 
+      className="flex-1 flex flex-col bg-editor-bg"
+      ref={timelineContainerRef}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      style={{ cursor: isDragging ? 'ew-resize' : 'default' }}
+    >
+      {/* Zoom Controls */}
+      <div className="flex items-center justify-between p-2 border-b border-gray-700">
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={handleZoomOut}
+            variant="outline"
+            size="sm"
+            className="text-gray-300 border-gray-600 hover:bg-gray-700"
+            title="Zoom Out"
+          >
+            <Minus className="w-4 h-4" />
+          </Button>
+          <span className="text-sm text-gray-300 min-w-[60px] text-center">
+            {Math.round(zoomLevel)}%
+          </span>
+          <Button
+            onClick={handleZoomIn}
+            variant="outline"
+            size="sm"
+            className="text-gray-300 border-gray-600 hover:bg-gray-700"
+            title="Zoom In"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          <Button
+            onClick={handleAutoFit}
+            variant="outline"
+            size="sm"
+            className="text-gray-300 border-gray-600 hover:bg-gray-700"
+            title="Auto-fit to content"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="text-xs text-gray-400">
+          Shift + drag to zoom
+        </div>
+      </div>
+      
       {/* Timeline Header */}
       <div className="panel-bg border-b border-gray-700 h-12 flex items-center">
         <div className="w-48 px-4 border-r border-gray-700 h-full flex items-center">
@@ -155,13 +260,14 @@ export function Timeline({
         </div>
         
         {/* Zoom Controls */}
-        <div className="w-32 px-4 border-l border-gray-700 h-full flex items-center justify-center space-x-2">
+        <div className="w-40 px-4 border-l border-gray-700 h-full flex items-center justify-center space-x-1">
           <Button
             variant="secondary"
             size="sm"
             className="w-6 h-6 p-0 bg-gray-700 hover:bg-gray-600"
             onClick={handleZoomOut}
             data-testid="button-zoom-out"
+            title="Zoom Out"
           >
             <Minus className="w-3 h-3" />
           </Button>
@@ -174,8 +280,19 @@ export function Timeline({
             className="w-6 h-6 p-0 bg-gray-700 hover:bg-gray-600"
             onClick={handleZoomIn}
             data-testid="button-zoom-in"
+            title="Zoom In"
           >
             <Plus className="w-3 h-3" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-6 h-6 p-0 bg-gray-700 hover:bg-gray-600"
+            onClick={handleAutoFit}
+            data-testid="button-zoom-autofit"
+            title="Autofit to content"
+          >
+            <Maximize2 className="w-3 h-3" />
           </Button>
         </div>
       </div>
@@ -207,6 +324,13 @@ export function Timeline({
               data-testid="waveform-canvas"
             />
           </div>
+          
+          {/* Zoom Hint */}
+          {isDragging && (
+            <div className="absolute bottom-4 right-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-sm">
+              Przeciągnij w prawo aby przybliżyć, w lewo aby oddalić
+            </div>
+          )}
         </div>
       </div>
     </main>

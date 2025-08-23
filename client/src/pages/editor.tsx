@@ -202,6 +202,10 @@ export default function AudioEditor() {
       )
     })));
   };
+  
+  const updateProjectData = (updates: Partial<ProjectData>) => {
+    setProjectData(prev => ({ ...prev, ...updates }));
+  };
 
   const deleteClip = (clipId: string) => {
     console.log('Editor: Deleting clip', clipId);
@@ -339,6 +343,7 @@ export default function AudioEditor() {
           onUpdateClip={updateClip}
           onDeleteClip={deleteClip}
           formatTime={formatTime}
+          onUpdateProjectData={updateProjectData}
           data-testid="timeline"
         />
       </div>
