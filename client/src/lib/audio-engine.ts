@@ -249,6 +249,21 @@ export class AudioEngine {
       gainNode.connect(panNode);
       panNode.connect(this.masterGain);
       
+      // Calculate timing first
+      let sourceStartTime = audioContextStartTime;
+      let sourceOffset = clip.offset;
+      let sourceDuration = clip.duration;
+      
+      if (currentTime > clipStartTime) {
+        // We're starting in the middle of this clip
+        const timeIntoClip = currentTime - clipStartTime;
+        sourceOffset += timeIntoClip;
+        sourceDuration -= timeIntoClip;
+      } else {
+        // Clip starts in the future
+        sourceStartTime += (clipStartTime - currentTime);
+      }
+      
       // Apply base volume and pan
       const baseVolume = clip.volume * track.volume;
       gainNode.gain.setValueAtTime(baseVolume, sourceStartTime);
@@ -269,21 +284,6 @@ export class AudioEngine {
           gainNode.gain.setValueAtTime(baseVolume, fadeOutStart);
           gainNode.gain.linearRampToValueAtTime(0, clipEndTime);
         }
-      }
-      
-      // Calculate timing
-      let sourceStartTime = audioContextStartTime;
-      let sourceOffset = clip.offset;
-      let sourceDuration = clip.duration;
-      
-      if (currentTime > clipStartTime) {
-        // We're starting in the middle of this clip
-        const timeIntoClip = currentTime - clipStartTime;
-        sourceOffset += timeIntoClip;
-        sourceDuration -= timeIntoClip;
-      } else {
-        // Clip starts in the future
-        sourceStartTime += (clipStartTime - currentTime);
       }
       
       // Start the source
