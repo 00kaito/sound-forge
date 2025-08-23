@@ -71,6 +71,28 @@ export default function AudioEditor() {
     initialize();
   }, [initialize]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // For now, we'd need to track selected clips
+        // This is a placeholder for future selection functionality
+        console.log('Delete key pressed - would delete selected clips');
+      }
+      if (e.key === ' ') {
+        e.preventDefault();
+        if (playbackState.isPlaying) {
+          pause();
+        } else {
+          play();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [playbackState.isPlaying, play, pause]);
+
   useEffect(() => {
     if (audioError) {
       toast({
@@ -124,7 +146,12 @@ export default function AudioEditor() {
         // Load into audio engine for playback
         if (isInitialized) {
           console.log('Editor: Loading audio file into engine', clip.audioFileId);
-          await loadAudioFile(clip.audioFileId, audioFile.file);
+          try {
+            const buffer = await loadAudioFile(clip.audioFileId, audioFile.file);
+            console.log('Editor: Audio buffer loaded successfully', { id: clip.audioFileId, duration: buffer.duration });
+          } catch (error) {
+            console.error('Editor: Failed to load audio into engine:', error);
+          }
         }
       } catch (error) {
         console.error('Failed to load audio buffer:', error);
@@ -145,6 +172,16 @@ export default function AudioEditor() {
           : track
       );
       console.log('Editor: New tracks state', newTracks.map(t => ({ id: t.id, clipCount: t.clips.length })));
+      
+      // Trigger timeline update after state change
+      setTimeout(() => {
+        if (isInitialized) {
+          const allClips = newTracks.flatMap(track => track.clips);
+          console.log('Editor: Updating timeline data with clips:', allClips.length);
+          setTimelineData(newTracks, allClips);
+        }
+      }, 100);
+      
       return newTracks;
     });
   };
@@ -159,10 +196,15 @@ export default function AudioEditor() {
   };
 
   const deleteClip = (clipId: string) => {
-    setTracks(tracks.map(track => ({
-      ...track,
-      clips: track.clips.filter(clip => clip.id !== clipId)
-    })));
+    console.log('Editor: Deleting clip', clipId);
+    setTracks(prevTracks => {
+      const newTracks = prevTracks.map(track => ({
+        ...track,
+        clips: track.clips.filter(clip => clip.id !== clipId)
+      }));
+      console.log('Editor: Tracks after deletion', newTracks.map(t => ({ id: t.id, clipCount: t.clips.length })));
+      return newTracks;
+    });
   };
 
   const handleExport = async (settings: ExportSettings) => {

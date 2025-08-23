@@ -49,6 +49,12 @@ export class AudioEngine {
       
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       this.tracks.set(audioFileId, audioBuffer);
+      console.log('Audio Engine: Audio buffer loaded and stored', {
+        id: audioFileId,
+        duration: audioBuffer.duration,
+        channels: audioBuffer.numberOfChannels,
+        totalLoaded: this.tracks.size
+      });
       return audioBuffer;
     } catch (error) {
       console.error('Failed to decode audio data:', error);
@@ -150,6 +156,13 @@ export class AudioEngine {
 
     this.playbackState.currentTime = this.audioContext.currentTime - this.startTime;
     this.playbackState.playhead = this.playbackState.currentTime;
+
+    // Auto-stop when reaching the end
+    if (this.playbackState.totalDuration > 0 && this.playbackState.currentTime >= this.playbackState.totalDuration) {
+      console.log('Audio Engine: Auto-stopping at end of timeline');
+      this.stop();
+      return;
+    }
 
     this.animationFrame = requestAnimationFrame(() => this.updatePlayhead());
   }

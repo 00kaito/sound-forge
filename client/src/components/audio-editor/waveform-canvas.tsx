@@ -148,7 +148,16 @@ export function WaveformCanvas({
                     borderColor: getClipColor(clipIndex),
                   }}
                   onMouseDown={(e) => handleClipMouseDown(e, clip)}
-                  onDoubleClick={() => onDeleteClip(clip.id)}
+                  onDoubleClick={() => {
+                    console.log('WaveformCanvas: Deleting clip', clip.id);
+                    onDeleteClip(clip.id);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    console.log('WaveformCanvas: Right-click delete clip', clip.id);
+                    onDeleteClip(clip.id);
+                  }}
+                  title={`${clip.name} - Double-click or right-click to delete`}
                   data-testid={`audio-clip-${clip.id}`}
                 >
                   {/* Waveform background */}
