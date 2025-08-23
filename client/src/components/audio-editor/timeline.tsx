@@ -15,6 +15,7 @@ interface TimelineProps {
   onDeleteClip: (clipId: string) => void;
   formatTime: (seconds: number) => string;
   onUpdateProjectData?: (updates: Partial<ProjectData>) => void;
+  onSeekTo?: (time: number) => void;
 }
 
 export function Timeline({
@@ -26,7 +27,8 @@ export function Timeline({
   onUpdateClip,
   onDeleteClip,
   formatTime,
-  onUpdateProjectData
+  onUpdateProjectData,
+  onSeekTo
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -43,6 +45,24 @@ export function Timeline({
   const updateZoom = (newZoom: number) => {
     const clampedZoom = Math.min(Math.max(newZoom, 25), 800);
     onUpdateProjectData?.({ zoomLevel: clampedZoom });
+  };
+  
+  // Handle timeline clicking for scrubbing
+  const handleTimelineClick = (e: React.MouseEvent) => {
+    if (!onSeekTo || isDragging) return;
+    
+    const timelineElement = e.currentTarget;
+    const rect = timelineElement.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const timePosition = clickX / pixelsPerSecond;
+    
+    // Ensure we don't seek beyond available content
+    const maxTime = Math.max(0, ...tracks.flatMap(track => 
+      track.clips.map(clip => clip.startTime + clip.duration)
+    ));
+    
+    const clampedTime = Math.max(0, Math.min(timePosition, maxTime));
+    onSeekTo(clampedTime);
   };
 
   const handleZoomIn = () => {
@@ -63,8 +83,9 @@ export function Timeline({
     
     const maxEndTime = Math.max(...allClips.map(clip => clip.startTime + clip.duration));
     const containerWidth = timelineContainerRef.current?.clientWidth || 800;
-    const targetPixelsPerSecond = (containerWidth - 200) / maxEndTime; // Leave some margin
-    const newZoom = Math.max(25, Math.min(800, (targetPixelsPerSecond / 100) * 100));
+    const targetPixelsPerSecond = (containerWidth - 250) / maxEndTime; // Leave margin
+    // Convert pixels per second to zoom percentage (base is 100 pixels per second at 100% zoom)
+    const newZoom = Math.max(25, Math.min(800, targetPixelsPerSecond));
     updateZoom(newZoom);
   };
   
@@ -164,7 +185,13 @@ export function Timeline({
     ctx.fillStyle = '#ffffff';
     ctx.font = '10px Inter';
     
-    const timeInterval = Math.max(1, Math.floor(100 / pixelsPerSecond)); // At least 1 second between markers
+    // Calculate appropriate time interval based on zoom level
+    let timeInterval = 1;
+    if (pixelsPerSecond > 200) timeInterval = 0.5; // Every 0.5s when zoomed in
+    else if (pixelsPerSecond > 100) timeInterval = 1; // Every 1s at normal zoom
+    else if (pixelsPerSecond > 50) timeInterval = 2; // Every 2s when zoomed out
+    else if (pixelsPerSecond > 25) timeInterval = 5; // Every 5s when very zoomed out
+    else timeInterval = 10; // Every 10s when extremely zoomed out
     
     for (let time = 0; time < width / pixelsPerSecond; time += timeInterval) {
       const x = time * pixelsPerSecond;
@@ -243,10 +270,12 @@ export function Timeline({
         <div className="flex-1 relative h-full">
           <canvas
             ref={timelineRef}
-            className="w-full h-full"
+            className="w-full h-full cursor-pointer"
             width={800}
             height={48}
+            onClick={handleTimelineClick}
             data-testid="canvas-timeline-ruler"
+            title="Click to seek to position"
           />
           
           {/* Playhead */}
@@ -259,42 +288,6 @@ export function Timeline({
           </div>
         </div>
         
-        {/* Zoom Controls */}
-        <div className="w-40 px-4 border-l border-gray-700 h-full flex items-center justify-center space-x-1">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-6 h-6 p-0 bg-gray-700 hover:bg-gray-600"
-            onClick={handleZoomOut}
-            data-testid="button-zoom-out"
-            title="Zoom Out"
-          >
-            <Minus className="w-3 h-3" />
-          </Button>
-          <span className="text-xs text-gray-400 font-mono w-12 text-center" data-testid="text-zoom-level">
-            {Math.round(zoomLevel)}%
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-6 h-6 p-0 bg-gray-700 hover:bg-gray-600"
-            onClick={handleZoomIn}
-            data-testid="button-zoom-in"
-            title="Zoom In"
-          >
-            <Plus className="w-3 h-3" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-6 h-6 p-0 bg-gray-700 hover:bg-gray-600"
-            onClick={handleAutoFit}
-            data-testid="button-zoom-autofit"
-            title="Autofit to content"
-          >
-            <Maximize2 className="w-3 h-3" />
-          </Button>
-        </div>
       </div>
 
       {/* Tracks Container */}

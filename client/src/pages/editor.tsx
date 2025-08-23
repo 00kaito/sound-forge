@@ -344,6 +344,7 @@ export default function AudioEditor() {
           onDeleteClip={deleteClip}
           formatTime={formatTime}
           onUpdateProjectData={updateProjectData}
+          onSeekTo={seekTo}
           data-testid="timeline"
         />
       </div>
