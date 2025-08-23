@@ -266,24 +266,42 @@ export class AudioEngine {
       
       // Apply base volume and pan
       const baseVolume = clip.volume * track.volume;
-      gainNode.gain.setValueAtTime(baseVolume, sourceStartTime);
       panNode.pan.value = track.pan;
       
-      // Apply fade in/out
+      // Apply fade in/out with proper scheduling
+      let initialVolume = baseVolume;
+      
+      // Handle fade in
       if (clip.fadeIn && clip.fadeIn > 0 && currentTime <= clipStartTime + clip.fadeIn) {
-        const fadeInStart = Math.max(sourceStartTime, audioContextStartTime);
         const fadeInEnd = sourceStartTime + clip.fadeIn;
-        gainNode.gain.setValueAtTime(0, fadeInStart);
+        gainNode.gain.setValueAtTime(0, sourceStartTime);
         gainNode.gain.linearRampToValueAtTime(baseVolume, fadeInEnd);
+        console.log('Audio Engine: Applied fade in', {
+          clipName: clip.name,
+          fadeInDuration: clip.fadeIn,
+          startTime: sourceStartTime,
+          endTime: fadeInEnd
+        });
+      } else {
+        gainNode.gain.setValueAtTime(baseVolume, sourceStartTime);
       }
       
+      // Handle fade out
       if (clip.fadeOut && clip.fadeOut > 0) {
         const sourceEndTime = sourceStartTime + sourceDuration;
         const fadeOutStart = sourceEndTime - clip.fadeOut;
-        if (fadeOutStart > sourceStartTime && fadeOutStart < sourceEndTime) {
-          gainNode.gain.setValueAtTime(baseVolume, fadeOutStart);
-          gainNode.gain.linearRampToValueAtTime(0, sourceEndTime);
-        }
+        
+        // Always apply fade out if it's defined
+        gainNode.gain.setValueAtTime(baseVolume, fadeOutStart);
+        gainNode.gain.linearRampToValueAtTime(0, sourceEndTime);
+        
+        console.log('Audio Engine: Applied fade out', {
+          clipName: clip.name,
+          fadeOutDuration: clip.fadeOut,
+          fadeOutStart: fadeOutStart,
+          sourceEndTime: sourceEndTime,
+          sourceDuration: sourceDuration
+        });
       }
       
       // Start the source
