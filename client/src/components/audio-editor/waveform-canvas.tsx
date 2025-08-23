@@ -1,0 +1,175 @@
+import { useRef, useEffect, useState } from 'react';
+import { Track, AudioClip } from '@/types/audio';
+
+interface WaveformCanvasProps {
+  tracks: Track[];
+  pixelsPerSecond: number;
+  playheadPosition: number;
+  onTrackDrop: (e: React.DragEvent, trackId: string) => void;
+  onUpdateClip: (clipId: string, updates: Partial<AudioClip>) => void;
+  onDeleteClip: (clipId: string) => void;
+}
+
+export function WaveformCanvas({
+  tracks,
+  pixelsPerSecond,
+  playheadPosition,
+  onTrackDrop,
+  onUpdateClip,
+  onDeleteClip
+}: WaveformCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [draggedClip, setDraggedClip] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  const TRACK_HEIGHT = 96; // 24 * 4 for h-24 equivalent
+
+  useEffect(() => {
+    renderWaveforms();
+  }, [tracks, pixelsPerSecond, playheadPosition]);
+
+  const renderWaveforms = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw track separators
+    ctx.strokeStyle = '#374151';
+    ctx.lineWidth = 1;
+    
+    for (let i = 1; i < tracks.length; i++) {
+      const y = i * TRACK_HEIGHT;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    // Draw playhead
+    if (playheadPosition >= 0 && playheadPosition <= width) {
+      ctx.strokeStyle = '#007acc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(playheadPosition, 0);
+      ctx.lineTo(playheadPosition, height);
+      ctx.stroke();
+    }
+  };
+
+  const handleClipMouseDown = (e: React.MouseEvent, clip: AudioClip) => {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDraggedClip(clip.id);
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const handleClipMouseMove = (e: React.MouseEvent) => {
+    if (!draggedClip) return;
+    
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const newX = e.clientX - rect.left - dragOffset.x;
+    const newStartTime = Math.max(0, newX / pixelsPerSecond);
+    
+    onUpdateClip(draggedClip, { startTime: newStartTime });
+  };
+
+  const handleClipMouseUp = () => {
+    setDraggedClip(null);
+    setDragOffset({ x: 0, y: 0 });
+  };
+
+  const handleTrackDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const getClipColor = (index: number): string => {
+    const colors = [
+      'rgb(79, 195, 247)', // Blue
+      'rgb(76, 175, 80)', // Green  
+      'rgb(156, 39, 176)', // Purple
+      'rgb(255, 152, 0)', // Orange
+      'rgb(244, 67, 54)', // Red
+    ];
+    return colors[index % colors.length];
+  };
+
+  return (
+    <div className="relative w-full">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full absolute top-0 left-0 pointer-events-none"
+        width={1200}
+        height={tracks.length * TRACK_HEIGHT}
+        data-testid="canvas-waveform"
+      />
+      
+      {/* Audio Clips Overlay */}
+      <div className="relative w-full">
+        {tracks.map((track, trackIndex) => (
+          <div
+            key={track.id}
+            className="h-24 border-b border-gray-700 relative flex items-center justify-center"
+            onDragOver={handleTrackDragOver}
+            onDrop={(e) => onTrackDrop(e, track.id)}
+            onMouseMove={handleClipMouseMove}
+            onMouseUp={handleClipMouseUp}
+            data-testid={`track-lane-${track.id}`}
+          >
+            {track.clips.length === 0 ? (
+              <span className="text-gray-500 text-sm pointer-events-none">
+                Drop audio files here
+              </span>
+            ) : (
+              track.clips.map((clip, clipIndex) => (
+                <div
+                  key={clip.id}
+                  className="absolute top-2 bottom-2 rounded cursor-pointer hover:opacity-80 transition-opacity border"
+                  style={{
+                    left: `${clip.startTime * pixelsPerSecond}px`,
+                    width: `${clip.duration * pixelsPerSecond}px`,
+                    backgroundColor: `${getClipColor(clipIndex)}33`,
+                    borderColor: getClipColor(clipIndex),
+                  }}
+                  onMouseDown={(e) => handleClipMouseDown(e, clip)}
+                  onDoubleClick={() => onDeleteClip(clip.id)}
+                  data-testid={`audio-clip-${clip.id}`}
+                >
+                  <div className="h-full flex items-center px-2">
+                    <span className="text-xs text-white truncate">{clip.name}</span>
+                  </div>
+                  
+                  {/* Resize handles */}
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-current cursor-ew-resize opacity-0 hover:opacity-100"></div>
+                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-current cursor-ew-resize opacity-0 hover:opacity-100"></div>
+                </div>
+              ))
+            )}
+          </div>
+        ))}
+        
+        {/* Empty tracks for expansion */}
+        {Array.from({ length: Math.max(0, 5 - tracks.length) }).map((_, index) => (
+          <div
+            key={`empty-${index}`}
+            className="h-24 border-b border-gray-700 relative flex items-center justify-center opacity-30"
+          >
+            <span className="text-gray-600 text-sm">Track {tracks.length + index + 1}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
