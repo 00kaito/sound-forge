@@ -22,6 +22,8 @@ export function WaveformCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggedClip, setDraggedClip] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [fadeEditMode, setFadeEditMode] = useState<{ clipId: string, type: 'fadeIn' | 'fadeOut' } | null>(null);
+  const [isDraggingFade, setIsDraggingFade] = useState(false);
 
   const TRACK_HEIGHT = 96; // 24 * 4 for h-24 equivalent
 
@@ -69,27 +71,64 @@ export function WaveformCanvas({
   const handleClipMouseDown = (e: React.MouseEvent, clip: AudioClip) => {
     e.preventDefault();
     const rect = e.currentTarget.getBoundingClientRect();
-    setDraggedClip(clip.id);
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
+    const clickX = e.clientX - rect.left;
+    const clipWidth = clip.duration * pixelsPerSecond;
+    
+    // Check if clicking on fade handles
+    const fadeInWidth = (clip.fadeIn || 0) * pixelsPerSecond;
+    const fadeOutWidth = (clip.fadeOut || 0) * pixelsPerSecond;
+    
+    if (clickX <= fadeInWidth + 10) {
+      // Clicking on fade-in handle
+      setFadeEditMode({ clipId: clip.id, type: 'fadeIn' });
+      setIsDraggingFade(true);
+    } else if (clickX >= clipWidth - fadeOutWidth - 10) {
+      // Clicking on fade-out handle
+      setFadeEditMode({ clipId: clip.id, type: 'fadeOut' });
+      setIsDraggingFade(true);
+    } else {
+      // Regular clip dragging
+      setDraggedClip(clip.id);
+      setDragOffset({
+        x: clickX,
+        y: e.clientY - rect.top
+      });
+    }
   };
 
   const handleClipMouseMove = (e: React.MouseEvent) => {
-    if (!draggedClip) return;
-    
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const newX = e.clientX - rect.left - dragOffset.x;
-    const newStartTime = Math.max(0, newX / pixelsPerSecond);
-    
-    onUpdateClip(draggedClip, { startTime: newStartTime });
+    if (isDraggingFade && fadeEditMode) {
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clipElement = e.currentTarget.querySelector(`[data-testid="audio-clip-${fadeEditMode.clipId}"]`);
+      if (!clipElement) return;
+      
+      const clipRect = clipElement.getBoundingClientRect();
+      const relativeX = e.clientX - clipRect.left;
+      const clipWidth = clipRect.width;
+      
+      if (fadeEditMode.type === 'fadeIn') {
+        const fadeInTime = Math.max(0, Math.min(relativeX / pixelsPerSecond, 5)); // Max 5 seconds
+        onUpdateClip(fadeEditMode.clipId, { fadeIn: fadeInTime });
+      } else if (fadeEditMode.type === 'fadeOut') {
+        const fadeOutTime = Math.max(0, Math.min((clipWidth - relativeX) / pixelsPerSecond, 5)); // Max 5 seconds
+        onUpdateClip(fadeEditMode.clipId, { fadeOut: fadeOutTime });
+      }
+    } else if (draggedClip) {
+      e.preventDefault();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const newX = e.clientX - rect.left - dragOffset.x;
+      const newStartTime = Math.max(0, newX / pixelsPerSecond);
+      
+      onUpdateClip(draggedClip, { startTime: newStartTime });
+    }
   };
 
   const handleClipMouseUp = () => {
     setDraggedClip(null);
     setDragOffset({ x: 0, y: 0 });
+    setFadeEditMode(null);
+    setIsDraggingFade(false);
   };
 
   const handleTrackDragOver = (e: React.DragEvent) => {
@@ -167,9 +206,49 @@ export function WaveformCanvas({
                     height={88} // h-24 minus padding
                   />
                   
+                  {/* Fade In Gradient */}
+                  {clip.fadeIn && clip.fadeIn > 0 && (
+                    <div 
+                      className="absolute top-0 left-0 bottom-0 pointer-events-none"
+                      style={{
+                        width: `${clip.fadeIn * pixelsPerSecond}px`,
+                        background: `linear-gradient(to right, rgba(0,0,0,0.7), transparent)`
+                      }}
+                    >
+                      <div className="absolute top-1 left-1 text-xs text-white opacity-75">
+                        ↗
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Fade Out Gradient */}
+                  {clip.fadeOut && clip.fadeOut > 0 && (
+                    <div 
+                      className="absolute top-0 right-0 bottom-0 pointer-events-none"
+                      style={{
+                        width: `${clip.fadeOut * pixelsPerSecond}px`,
+                        background: `linear-gradient(to left, rgba(0,0,0,0.7), transparent)`
+                      }}
+                    >
+                      <div className="absolute top-1 right-1 text-xs text-white opacity-75">
+                        ↘
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="h-full flex items-center px-2 relative z-10">
                     <span className="text-xs text-white truncate drop-shadow">{clip.name}</span>
                   </div>
+                  
+                  {/* Fade Handles */}
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 w-3 cursor-col-resize opacity-0 hover:opacity-100 bg-gradient-to-r from-white to-transparent"
+                    title="Drag to adjust fade in"
+                  ></div>
+                  <div 
+                    className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize opacity-0 hover:opacity-100 bg-gradient-to-l from-white to-transparent"
+                    title="Drag to adjust fade out"
+                  ></div>
                   
                   {/* Resize handles */}
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-current cursor-ew-resize opacity-0 hover:opacity-100"></div>

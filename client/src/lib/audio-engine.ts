@@ -249,9 +249,27 @@ export class AudioEngine {
       gainNode.connect(panNode);
       panNode.connect(this.masterGain);
       
-      // Apply settings
-      gainNode.gain.value = clip.volume * track.volume;
+      // Apply base volume and pan
+      const baseVolume = clip.volume * track.volume;
+      gainNode.gain.setValueAtTime(baseVolume, sourceStartTime);
       panNode.pan.value = track.pan;
+      
+      // Apply fade in/out
+      if (clip.fadeIn && clip.fadeIn > 0 && currentTime <= clipStartTime + clip.fadeIn) {
+        const fadeInStart = Math.max(sourceStartTime, audioContextStartTime);
+        const fadeInEnd = audioContextStartTime + clip.fadeIn;
+        gainNode.gain.setValueAtTime(0, fadeInStart);
+        gainNode.gain.linearRampToValueAtTime(baseVolume, fadeInEnd);
+      }
+      
+      if (clip.fadeOut && clip.fadeOut > 0) {
+        const clipEndTime = audioContextStartTime + clip.duration;
+        const fadeOutStart = clipEndTime - clip.fadeOut;
+        if (fadeOutStart > sourceStartTime) {
+          gainNode.gain.setValueAtTime(baseVolume, fadeOutStart);
+          gainNode.gain.linearRampToValueAtTime(0, clipEndTime);
+        }
+      }
       
       // Calculate timing
       let sourceStartTime = audioContextStartTime;
