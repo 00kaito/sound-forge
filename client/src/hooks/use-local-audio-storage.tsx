@@ -7,6 +7,7 @@ export function useLocalAudioStorage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const addAudioFile = useCallback(async (file: File): Promise<LocalAudioFile> => {
+    console.log('LocalAudioStorage: Adding audio file', file.name);
     // Get duration from audio file
     const duration = await getAudioDuration(file);
     
@@ -17,7 +18,16 @@ export function useLocalAudioStorage() {
       duration
     };
 
-    setAudioFiles(prev => [...prev, audioFile]);
+    console.log('LocalAudioStorage: Created file object', { id: audioFile.id, name: audioFile.name, duration });
+    
+    setAudioFiles(prev => {
+      const newFiles = [...prev, audioFile];
+      console.log('LocalAudioStorage: Updated files array to length', newFiles.length);
+      console.log('LocalAudioStorage: Files:', newFiles.map(f => ({ id: f.id, name: f.name })));
+      return newFiles;
+    });
+    
+    console.log('LocalAudioStorage: File added successfully');
     return audioFile;
   }, []);
 

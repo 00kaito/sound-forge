@@ -35,8 +35,12 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
     try {
       const promises = Array.from(files).map(async (file) => {
         if (file.type.startsWith('audio/')) {
-          return await addAudioFile(file);
+          console.log('Sidebar: Processing audio file', file.name, file.type);
+          const result = await addAudioFile(file);
+          console.log('Sidebar: Audio file added', result);
+          return result;
         } else {
+          console.log('Sidebar: Invalid file type', file.type);
           toast({
             title: "Invalid File",
             description: "Please select an audio file (MP3, WAV, FLAC, M4A).",
