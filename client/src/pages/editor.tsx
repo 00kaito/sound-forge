@@ -274,16 +274,35 @@ export default function AudioEditor() {
         }
       );
       
-      // Convert to WAV and download
+      // Convert to selected format and download
       console.log('Export: Rendered buffer info', {
         channels: renderedBuffer.numberOfChannels,
         sampleRate: renderedBuffer.sampleRate,
         length: renderedBuffer.length,
-        duration: renderedBuffer.length / renderedBuffer.sampleRate
+        duration: renderedBuffer.length / renderedBuffer.sampleRate,
+        selectedFormat: settings.format
       });
 
-      const wavBlob = await AudioConcatenator.audioBufferToWavBlob(renderedBuffer);
-      AudioConcatenator.downloadBlob(wavBlob, `${settings.fileName}.${settings.format}`);
+      let audioBlob: Blob;
+      
+      if (settings.format === 'mp3') {
+        // For now, convert to WAV but warn user that MP3 is not yet supported
+        console.warn('MP3 export not yet implemented, exporting as WAV instead');
+        audioBlob = await AudioConcatenator.audioBufferToWavBlob(renderedBuffer);
+        
+        toast({
+          title: "Format Note",
+          description: "MP3 export is not yet available. Exported as WAV instead.",
+          variant: "default"
+        });
+      } else {
+        // Default to WAV for now
+        audioBlob = await AudioConcatenator.audioBufferToWavBlob(renderedBuffer);
+      }
+      
+      // Download with correct extension
+      const actualFormat = settings.format === 'mp3' ? 'wav' : settings.format;
+      AudioConcatenator.downloadBlob(audioBlob, `${settings.fileName}.${actualFormat}`);
       
       toast({
         title: "Export Complete",
