@@ -272,17 +272,17 @@ export class AudioEngine {
       // Apply fade in/out
       if (clip.fadeIn && clip.fadeIn > 0 && currentTime <= clipStartTime + clip.fadeIn) {
         const fadeInStart = Math.max(sourceStartTime, audioContextStartTime);
-        const fadeInEnd = audioContextStartTime + clip.fadeIn;
+        const fadeInEnd = sourceStartTime + clip.fadeIn;
         gainNode.gain.setValueAtTime(0, fadeInStart);
         gainNode.gain.linearRampToValueAtTime(baseVolume, fadeInEnd);
       }
       
       if (clip.fadeOut && clip.fadeOut > 0) {
-        const clipEndTime = audioContextStartTime + clip.duration;
-        const fadeOutStart = clipEndTime - clip.fadeOut;
-        if (fadeOutStart > sourceStartTime) {
+        const sourceEndTime = sourceStartTime + sourceDuration;
+        const fadeOutStart = sourceEndTime - clip.fadeOut;
+        if (fadeOutStart > sourceStartTime && fadeOutStart < sourceEndTime) {
           gainNode.gain.setValueAtTime(baseVolume, fadeOutStart);
-          gainNode.gain.linearRampToValueAtTime(0, clipEndTime);
+          gainNode.gain.linearRampToValueAtTime(0, sourceEndTime);
         }
       }
       
