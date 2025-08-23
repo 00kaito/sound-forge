@@ -74,17 +74,24 @@ export function Timeline({
   };
   
   const handleAutoFit = () => {
-    // Find the longest clip end time
+    // Find all clips from all tracks
     const allClips = tracks.flatMap(track => track.clips);
     if (allClips.length === 0) {
       updateZoom(100);
       return;
     }
     
+    // Find the furthest end time across all tracks
     const maxEndTime = Math.max(...allClips.map(clip => clip.startTime + clip.duration));
     const containerWidth = timelineContainerRef.current?.clientWidth || 800;
-    const targetPixelsPerSecond = (containerWidth - 250) / maxEndTime; // Leave margin
-    // Convert pixels per second to zoom percentage (base is 100 pixels per second at 100% zoom)
+    
+    // Calculate available width (subtract sidebar width and margins)
+    const availableWidth = containerWidth - 250; // 250px for sidebar and margins
+    
+    // Calculate target pixels per second to fit all content
+    const targetPixelsPerSecond = availableWidth / maxEndTime;
+    
+    // Convert to zoom percentage (100 pixels per second = 100% zoom)
     const newZoom = Math.max(25, Math.min(800, targetPixelsPerSecond));
     updateZoom(newZoom);
   };
