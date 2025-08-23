@@ -287,8 +287,11 @@ export function Timeline({
           
           {/* Playhead */}
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10 pointer-events-none"
-            style={{ left: `${playheadPosition}px` }}
+            className="absolute top-0 w-0.5 bg-blue-500 z-10 pointer-events-none"
+            style={{ 
+              left: `${playheadPosition}px`,
+              height: '100vh' // Full viewport height to go through all tracks
+            }}
             data-testid="playhead"
           >
             <div className="w-3 h-3 bg-blue-500 transform -translate-x-1/2 -translate-y-1/2 absolute top-1/2"></div>

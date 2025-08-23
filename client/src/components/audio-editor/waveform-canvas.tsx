@@ -57,15 +57,7 @@ export function WaveformCanvas({
       ctx.stroke();
     }
 
-    // Draw playhead through all tracks
-    if (playheadPosition >= 0 && playheadPosition <= width) {
-      ctx.strokeStyle = '#007acc';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(playheadPosition, 0);
-      ctx.lineTo(playheadPosition, height);
-      ctx.stroke();
-    }
+    // Playhead is drawn in timeline component, not here
   };
 
   const handleClipMouseDown = (e: React.MouseEvent, clip: AudioClip) => {
