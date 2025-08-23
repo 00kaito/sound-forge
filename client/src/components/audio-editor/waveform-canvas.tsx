@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Track, AudioClip } from '@/types/audio';
+import { WaveformVisualization } from './waveform-visualization';
 
 interface WaveformCanvasProps {
   tracks: Track[];
@@ -111,7 +112,7 @@ export function WaveformCanvas({
       <canvas
         ref={canvasRef}
         className="w-full h-full absolute top-0 left-0 pointer-events-none"
-        width={1200}
+        width={Math.max(1200, window.innerWidth * 2)}
         height={tracks.length * TRACK_HEIGHT}
         data-testid="canvas-waveform"
       />
@@ -123,7 +124,10 @@ export function WaveformCanvas({
             key={track.id}
             className="h-24 border-b border-gray-700 relative flex items-center justify-center"
             onDragOver={handleTrackDragOver}
-            onDrop={(e) => onTrackDrop(e, track.id)}
+            onDrop={(e) => {
+              console.log('WaveformCanvas: Drop event on track', track.id);
+              onTrackDrop(e, track.id);
+            }}
             onMouseMove={handleClipMouseMove}
             onMouseUp={handleClipMouseUp}
             data-testid={`track-lane-${track.id}`}
@@ -147,8 +151,15 @@ export function WaveformCanvas({
                   onDoubleClick={() => onDeleteClip(clip.id)}
                   data-testid={`audio-clip-${clip.id}`}
                 >
-                  <div className="h-full flex items-center px-2">
-                    <span className="text-xs text-white truncate">{clip.name}</span>
+                  {/* Waveform background */}
+                  <WaveformVisualization
+                    clip={clip}
+                    width={clip.duration * pixelsPerSecond}
+                    height={88} // h-24 minus padding
+                  />
+                  
+                  <div className="h-full flex items-center px-2 relative z-10">
+                    <span className="text-xs text-white truncate drop-shadow">{clip.name}</span>
                   </div>
                   
                   {/* Resize handles */}

@@ -109,17 +109,21 @@ export default function AudioEditor() {
   };
 
   const addClipToTrack = async (trackId: string, clip: AudioClip) => {
+    console.log('Editor: addClipToTrack called', { trackId, clipId: clip.id, clipName: clip.name });
+    
     // Load the audio file into both local storage and audio engine
     const audioFile = getAudioFile(clip.audioFileId);
     if (audioFile) {
       try {
         // Load buffer in local storage if not already loaded
         if (!audioFile.audioBuffer) {
+          console.log('Editor: Loading audio buffer for', clip.name);
           await loadAudioBuffer(audioFile);
         }
         
         // Load into audio engine for playback
         if (isInitialized) {
+          console.log('Editor: Loading audio file into engine', clip.audioFileId);
           await loadAudioFile(clip.audioFileId, audioFile.file);
         }
       } catch (error) {
@@ -133,11 +137,16 @@ export default function AudioEditor() {
       }
     }
     
-    setTracks(tracks.map(track =>
-      track.id === trackId
-        ? { ...track, clips: [...track.clips, clip] }
-        : track
-    ));
+    console.log('Editor: Adding clip to tracks state');
+    setTracks(prevTracks => {
+      const newTracks = prevTracks.map(track =>
+        track.id === trackId
+          ? { ...track, clips: [...track.clips, clip] }
+          : track
+      );
+      console.log('Editor: New tracks state', newTracks.map(t => ({ id: t.id, clipCount: t.clips.length })));
+      return newTracks;
+    });
   };
 
   const updateClip = (clipId: string, updates: Partial<AudioClip>) => {

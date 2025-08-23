@@ -47,7 +47,10 @@ export function Timeline({
     
     try {
       const audioFileData = e.dataTransfer.getData('audio-file');
-      if (!audioFileData) return;
+      if (!audioFileData) {
+        console.log('Timeline: No audio-file data in drop');
+        return;
+      }
       
       const audioFile = JSON.parse(audioFileData);
       const rect = e.currentTarget.getBoundingClientRect();
@@ -66,6 +69,8 @@ export function Timeline({
         fadeOut: 0,
         name: audioFile.name
       };
+      
+      console.log('Timeline: Adding clip to track', { trackId, clipName: newClip.name, startTime });
       
       // Add clip to track via dedicated callback
       onAddClipToTrack(trackId, newClip);
@@ -182,16 +187,18 @@ export function Timeline({
         </div>
 
         {/* Waveform/Timeline Area */}
-        <div className="flex-1 overflow-auto relative bg-editor-bg">
-          <WaveformCanvas
-            tracks={tracks}
-            pixelsPerSecond={pixelsPerSecond}
-            playheadPosition={playheadPosition}
-            onTrackDrop={handleTrackDrop}
-            onUpdateClip={onUpdateClip}
-            onDeleteClip={onDeleteClip}
-            data-testid="waveform-canvas"
-          />
+        <div className="flex-1 overflow-x-auto overflow-y-auto relative bg-editor-bg">
+          <div className="min-w-max" style={{ width: Math.max(1200, (playbackState.totalDuration || 60) * pixelsPerSecond + 200) }}>
+            <WaveformCanvas
+              tracks={tracks}
+              pixelsPerSecond={pixelsPerSecond}
+              playheadPosition={playheadPosition}
+              onTrackDrop={handleTrackDrop}
+              onUpdateClip={onUpdateClip}
+              onDeleteClip={onDeleteClip}
+              data-testid="waveform-canvas"
+            />
+          </div>
         </div>
       </div>
     </main>
