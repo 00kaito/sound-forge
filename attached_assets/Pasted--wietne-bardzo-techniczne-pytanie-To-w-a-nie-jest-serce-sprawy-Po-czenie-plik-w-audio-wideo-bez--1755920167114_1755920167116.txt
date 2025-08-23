@@ -1,0 +1,112 @@
+Świetne, bardzo techniczne pytanie! To właśnie jest serce sprawy. Połączenie plików audio/wideo bez wysyłania ich na serwer jest jak najbardziej możliwe i opiera się na potędze nowoczesnych API przeglądarek.
+
+Oto szczegółowe wyjaśnienie, jak to działa krok po kroku:
+
+1. Dostęp do plików: File API
+
+Użytkownik wybiera kilka plików z dysku za pomocą <input type="file" multiple>. Przeglądarka ma do nich dostęp jako obiektyFile (lub Blob). Ważne: pliki są tylko w pamięci przeglądarki użytkownika, nie są wysyłane na żaden serwer.
+
+2. Wczytanie zawartości plików: FileReader
+
+Aby przetworzyć pliki, ich zawartość musi zostać wczytana do pamięci operacyjnej (RAM) przeglądarki. Robi się to za pomocą FileReader.readAsArrayBuffer(). Dla każdego pliku otrzymujesz ArrayBuffer – surowy, binarny format danych.
+
+```javascript
+const fileInput = document.getElementById('fileInput');
+const files = fileInput.files; // Lista obiektów File
+
+const arrayBuffers = [];
+for (const file of files) {
+    const arrayBuffer = await file.arrayBuffer(); // Czytanie pliku do ArrayBuffer
+    arrayBuffers.push(arrayBuffer);
+}
+```
+
+3. Dekodowanie i przetworzenie (na przykładzie audio)
+
+Teraz, w zależności od typu pliku, musisz go zdekodować do formatu, którym możesz manipulować.
+
+· Dla audio: Używasz Web Audio API i metody decodeAudioData(), aby zamienić ArrayBuffer na AudioBuffer. AudioBuffer to obiekt, który reprezentuje dźwięk w formie surowych próbek, gotowy do odtworzenia, przycięcia, zmiany głośności itp.
+  ```javascript
+  const audioContext = new AudioContext();
+  const audioBuffers = [];
+  
+  for (const buffer of arrayBuffers) {
+      const decodedAudio = await audioContext.decodeAudioData(buffer);
+      audioBuffers.push(decodedAudio);
+  }
+  ```
+· Dla wideo: Jest trudniej. Musisz wczytać plik wideo do elementu <video> lub użyć WebCodecs API (VideoDecoder), aby wydobyć i zdekodować poszczególne klatki do ImageBitmap lub wyświetlić je na <canvas>. To jest bardziej złożone.
+
+4. Łączenie (Konkatenacja) – Najważniejszy krok
+
+Teraz musisz połączyć swoje AudioBuffer lub klatki wideo w jeden, duży bufor.
+
+· Dla Audio:
+  1. Oblicz łączną długość nowego pliku (suma długości wszystkich audioBuffers).
+  2. Stwórz nowy, pusty AudioBuffer o tej łącznej długości.
+  3. Skopiuj dane z każdego źródłowego AudioBuffer do nowego, dużego bufora, jeden po drugim.
+  ```javascript
+  function concatenateAudioBuffers(audioContext, buffers) {
+      // 1. Oblicz łączną długość
+      const totalLength = buffers.reduce((sum, buffer) => sum + buffer.length, 0);
+      
+      // 2. Stwórz nowy bufor
+      const outputBuffer = audioContext.createBuffer(
+          buffers[0].numberOfChannels, // np. 2 dla stereo
+          totalLength,
+          buffers[0].sampleRate // np. 44100 Hz
+      );
+      
+      // 3. Skopiuj dane kanał po kanale
+      let offset = 0;
+      for (const buffer of buffers) {
+          for (let channel = 0; channel < outputBuffer.numberOfChannels; channel++) {
+              const outputData = outputBuffer.getChannelData(channel);
+              const inputData = buffer.getChannelData(channel);
+              // Skopiuj próbki z inputData do outputData, zaczynając od 'offset'
+              outputData.set(inputData, offset);
+          }
+          offset += buffer.length; // Przesuń offset o długość właśnie skopiowanego pliku
+      }
+      return outputBuffer;
+  }
+  
+  const finalAudioBuffer = concatenateAudioBuffers(audioContext, audioBuffers);
+  ```
+· Dla Wideo: Proces jest analogiczny, ale operuje na sekwencji klatek. Musisz:
+  1. Pobrać klatki z każdego pliku wideo (używając videoElement lub VideoDecoder).
+  2. "Narysować" je po kolei na elemencie <canvas>.
+  3. Jednocześnie zakodować tę sekwencję klatek z canvas z powrotem do pliku wideo, używając MediaRecorder API lub WebCodecs API (VideoEncoder). To jest bardzo wymagające obliczeniowo.
+
+5. Eksport i pobranie
+
+Gdy już masz połączony plik w pamięci, czas go zapisać.
+
+· Dla Audio: Możesz "odtworzyć" swój finalAudioBuffer i nagrać sygnał wyjściowy z AudioContext używając MediaRecorder (dla formatów like WebM) lub ręcznie zakodować go do WAV (prosty format, łatwy do zapisania binarnie).
+  ```javascript
+  // Prosty przykład dla WAV:
+  function audioBufferToWavBlob(buffer) {
+      // ... pomijam kodowanie WAV, to dłuższa funkcja...
+      // Zwraca obiekt Blob (Binary Large Object) typu 'audio/wav'
+      return new Blob([wavData], { type: 'audio/wav' });
+  }
+  
+  const wavBlob = audioBufferToWavBlob(finalAudioBuffer);
+  const url = URL.createObjectURL(wavBlob);
+  
+  // Tworzymy link do pobrania
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'polaczony-plik.wav';
+  a.click(); // Symulujemy kliknięcie, aby pobrać plik
+  
+  // Sprzątanie
+  URL.revokeObjectURL(url);
+  ```
+· Dla Wideo: Używasz MediaRecorder do nagrania zawartości canvas i otrzymania Blob w formacie video/webm. Następnie robisz to samo: tworzysz URL i oferujesz pobranie.
+
+Podsumowanie techniczne:
+
+Cały proces odbywa się w pamięci operacyjnej (RAM) komputera użytkownika. File-> ArrayBuffer -> AudioBuffer/ImageBitmap -> Przetworzenie/Łączenie -> Blob -> URL.createObjectURL() -> Pobranie na dysk użytkownika.
+
+Żadne dane nie opuszczają przeglądarki. Serwer nie jest do tego potrzebny. To potężny mechanizm, który umożliwia tworzenie w pełni funkcjonalnych, desktopowych aplikacji działających w... oknie przeglądarki.

@@ -27,12 +27,17 @@ export function useAudioEngine() {
     }
   }, []);
 
-  const loadAudioFile = useCallback(async (audioFileId: string, arrayBuffer: ArrayBuffer) => {
+  const loadAudioFile = useCallback(async (audioFileId: string, file: File | ArrayBuffer) => {
     if (!engineRef.current) {
       throw new Error('Audio engine not initialized');
     }
     
-    return await engineRef.current.loadAudioFile(audioFileId, arrayBuffer);
+    return await engineRef.current.loadAudioFile(audioFileId, file);
+  }, []);
+
+  const getAudioBuffer = useCallback((audioFileId: string) => {
+    if (!engineRef.current) return undefined;
+    return engineRef.current.getAudioBuffer(audioFileId);
   }, []);
 
   const play = useCallback(() => {
@@ -112,6 +117,7 @@ export function useAudioEngine() {
     playbackState,
     error,
     loadAudioFile,
+    getAudioBuffer,
     play,
     pause,
     stop,

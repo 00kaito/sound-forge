@@ -6,22 +6,35 @@ interface ToolbarProps {
   playbackState: PlaybackState;
   formatTime: (seconds: number) => string;
   onExport: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onStop?: () => void;
+  onSeekToStart?: () => void;
 }
 
-export function Toolbar({ playbackState, formatTime, onExport }: ToolbarProps) {
+export function Toolbar({ 
+  playbackState, 
+  formatTime, 
+  onExport,
+  onPlay,
+  onPause, 
+  onStop,
+  onSeekToStart
+}: ToolbarProps) {
   const handlePlay = () => {
-    // TODO: Connect to audio engine
-    console.log('Play/Pause clicked');
+    if (playbackState.isPlaying) {
+      onPause?.();
+    } else {
+      onPlay?.();
+    }
   };
 
   const handleStop = () => {
-    // TODO: Connect to audio engine
-    console.log('Stop clicked');
+    onStop?.();
   };
 
   const handleGoToStart = () => {
-    // TODO: Connect to audio engine
-    console.log('Go to start clicked');
+    onSeekToStart?.();
   };
 
   return (

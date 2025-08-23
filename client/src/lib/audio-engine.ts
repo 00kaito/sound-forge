@@ -30,12 +30,20 @@ export class AudioEngine {
     }
   }
 
-  async loadAudioFile(audioFileId: string, arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
+  async loadAudioFile(audioFileId: string, file: File | ArrayBuffer): Promise<AudioBuffer> {
     if (!this.audioContext) {
       throw new Error('Audio context not initialized');
     }
 
     try {
+      let arrayBuffer: ArrayBuffer;
+      
+      if (file instanceof File) {
+        arrayBuffer = await file.arrayBuffer();
+      } else {
+        arrayBuffer = file;
+      }
+      
       const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       this.tracks.set(audioFileId, audioBuffer);
       return audioBuffer;
@@ -43,6 +51,10 @@ export class AudioEngine {
       console.error('Failed to decode audio data:', error);
       throw new Error('Failed to load audio file');
     }
+  }
+
+  getAudioBuffer(audioFileId: string): AudioBuffer | undefined {
+    return this.tracks.get(audioFileId);
   }
 
   createTrackGain(trackId: string): GainNode {
@@ -146,12 +158,36 @@ export class AudioEngine {
 
     const offlineContext = new OfflineAudioContext(numberOfChannels, length, sampleRate);
     
-    // TODO: Implement full audio rendering logic
-    // This is a simplified version - in production you'd need to:
-    // 1. Create source nodes for each clip
-    // 2. Apply volume, pan, and effects
-    // 3. Schedule all clips according to their timeline positions
-    // 4. Render the final mix
+    // Create master gain node for offline context
+    const masterGain = offlineContext.createGain();
+    masterGain.connect(offlineContext.destination);
+
+    // Process each clip
+    for (const clip of clips) {
+      const audioBuffer = this.tracks.get(clip.audioFileId);
+      if (!audioBuffer) continue;
+
+      const source = offlineContext.createBufferSource();
+      const gainNode = offlineContext.createGain();
+      const panNode = offlineContext.createStereoPanner();
+
+      // Find the track for this clip
+      const track = tracks.find(t => t.id === clip.trackId);
+      if (!track) continue;
+
+      // Set up audio graph
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      gainNode.connect(panNode);
+      panNode.connect(masterGain);
+
+      // Apply clip settings
+      gainNode.gain.value = clip.volume * track.volume;
+      panNode.pan.value = track.pan;
+
+      // Start the source at the correct time
+      source.start(clip.startTime, clip.offset, clip.duration);
+    }
 
     return await offlineContext.startRendering();
   }

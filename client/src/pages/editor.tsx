@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
+import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
 import { Toolbar } from '@/components/audio-editor/toolbar';
 import { Sidebar } from '@/components/audio-editor/sidebar';
 import { Timeline } from '@/components/audio-editor/timeline';
@@ -8,7 +9,19 @@ import { Track, AudioClip, ProjectData, ExportSettings } from '@/types/audio';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AudioEditor() {
-  const { initialize, isInitialized, playbackState, error: audioError } = useAudioEngine();
+  const { 
+    initialize, 
+    isInitialized, 
+    playbackState, 
+    error: audioError, 
+    loadAudioFile, 
+    exportAudio, 
+    play, 
+    pause, 
+    stop, 
+    seekTo 
+  } = useAudioEngine();
+  const { audioFiles, getAudioFile, loadAudioBuffer } = useLocalAudioStorage();
   const { toast } = useToast();
   
   const [tracks, setTracks] = useState<Track[]>([
@@ -116,24 +129,96 @@ export default function AudioEditor() {
         description: "Your audio is being processed..."
       });
 
-      // TODO: Implement actual audio export
-      // This would involve rendering all tracks and clips into a single audio file
-      console.log('Exporting with settings:', settings);
+      // Load audio buffers for all clips
+      for (const track of tracks) {
+        for (const clip of track.clips) {
+          const audioFile = getAudioFile(clip.audioFileId);
+          if (audioFile) {
+            await loadAudioBuffer(audioFile);
+          }
+        }
+      }
+
+      // Get all clips from all tracks
+      const allClips = tracks.flatMap(track => track.clips);
       
-      // Simulate export process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Export the audio
+      const audioBuffer = await exportAudio(tracks, allClips);
+      
+      // Convert to desired format and download
+      await downloadAudioBuffer(audioBuffer, settings);
       
       toast({
         title: "Export Complete",
         description: `${settings.fileName}.${settings.format} has been downloaded.`
       });
     } catch (error) {
+      console.error('Export error:', error);
       toast({
         title: "Export Failed",
         description: "There was an error exporting your audio.",
         variant: "destructive"
       });
     }
+  };
+
+  const downloadAudioBuffer = async (audioBuffer: AudioBuffer, settings: ExportSettings) => {
+    // Convert AudioBuffer to WAV (basic implementation)
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numberOfChannels * 2 + 44;
+    const buffer = new ArrayBuffer(length);
+    const view = new DataView(buffer);
+    const channels = [];
+    let offset = 0;
+    let pos = 0;
+
+    // Write WAV header
+    setUint32(0x46464952); // "RIFF"
+    setUint32(length - 8); // file length - 8
+    setUint32(0x45564157); // "WAVE"
+    setUint32(0x20746d66); // "fmt " chunk
+    setUint32(16); // length = 16
+    setUint16(1); // PCM (uncompressed)
+    setUint16(numberOfChannels);
+    setUint32(audioBuffer.sampleRate);
+    setUint32(audioBuffer.sampleRate * 2 * numberOfChannels); // avg. bytes/sec
+    setUint16(numberOfChannels * 2); // block-align
+    setUint16(16); // 16-bit
+    setUint32(0x61746164); // "data" - chunk
+    setUint32(length - pos - 4); // chunk length
+
+    // Write interleaved data
+    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+      channels.push(audioBuffer.getChannelData(i));
+    }
+
+    while (pos < length) {
+      for (let i = 0; i < numberOfChannels; i++) {
+        const sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        pos += 2;
+      }
+      offset++;
+    }
+
+    function setUint16(data: number) {
+      view.setUint16(pos, data, true);
+      pos += 2;
+    }
+
+    function setUint32(data: number) {
+      view.setUint32(pos, data, true);
+      pos += 4;
+    }
+
+    // Create blob and download
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${settings.fileName}.${settings.format}`;
+    link.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const formatTime = (seconds: number): string => {
@@ -160,6 +245,10 @@ export default function AudioEditor() {
         playbackState={playbackState}
         formatTime={formatTime}
         onExport={() => setIsExportModalOpen(true)}
+        onPlay={play}
+        onPause={pause}
+        onStop={stop}
+        onSeekToStart={() => seekTo(0)}
         data-testid="toolbar"
       />
       

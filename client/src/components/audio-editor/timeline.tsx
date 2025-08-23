@@ -1,8 +1,8 @@
 import { useRef, useEffect, useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TrackHeader } from './track-header';
-import { WaveformCanvas } from './waveform-canvas';
+import { TrackHeader } from '@/components/audio-editor/track-header';
+import { WaveformCanvas } from '@/components/audio-editor/waveform-canvas';
 import { Track, PlaybackState, ProjectData, AudioClip } from '@/types/audio';
 
 interface TimelineProps {
@@ -50,10 +50,10 @@ export function Timeline({
       const audioFile = JSON.parse(audioFileData);
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      const startTime = x / pixelsPerSecond;
+      const startTime = Math.max(0, x / pixelsPerSecond);
       
       const newClip: AudioClip = {
-        id: `clip-${Date.now()}`,
+        id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         audioFileId: audioFile.id,
         trackId,
         startTime,
@@ -65,7 +65,7 @@ export function Timeline({
         name: audioFile.name
       };
       
-      // Add clip to track
+      // Add clip to track via parent callback
       const track = tracks.find(t => t.id === trackId);
       if (track) {
         onUpdateTrack(trackId, {
@@ -178,7 +178,7 @@ export function Timeline({
             <TrackHeader
               key={track.id}
               track={track}
-              onUpdate={(updates) => onUpdateTrack(track.id, updates)}
+              onUpdate={(updates: Partial<Track>) => onUpdateTrack(track.id, updates)}
               data-testid={`track-header-${track.id}`}
             />
           ))}

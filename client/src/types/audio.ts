@@ -29,6 +29,14 @@ export interface ProjectData {
   viewportStart: number;
 }
 
+export interface LocalAudioFile {
+  id: string;
+  file: File;
+  name: string;
+  duration: number;
+  audioBuffer?: AudioBuffer;
+}
+
 export interface ExportSettings {
   format: 'mp3' | 'wav' | 'flac';
   quality: number;

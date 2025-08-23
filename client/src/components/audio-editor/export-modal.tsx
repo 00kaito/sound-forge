@@ -98,7 +98,7 @@ export function ExportModal({ isOpen, onClose, onExport }: ExportModalProps) {
             </Label>
             <Select
               value={exportSettings.format}
-              onValueChange={(value: any) => 
+              onValueChange={(value: 'mp3' | 'wav' | 'flac') => 
                 setExportSettings(prev => ({ ...prev, format: value, quality: qualityOptions[value][0].value }))
               }
               data-testid="select-export-format"

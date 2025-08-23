@@ -1,11 +1,10 @@
 import { useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus } from 'lucide-react';
+import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Track, AudioClip } from '@/types/audio';
+import { Track, AudioClip, LocalAudioFile } from '@/types/audio';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
 
 interface SidebarProps {
   tracks: Track[];
@@ -18,50 +17,47 @@ interface SidebarProps {
 export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onToolChange }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const { audioFiles, addAudioFile, removeAudioFile } = useLocalAudioStorage();
 
-  const { data: audioFiles = [] } = useQuery({
-    queryKey: ['/api/audio'],
-  });
-
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append('audio', file);
-      const response = await apiRequest('POST', '/api/audio/upload', formData);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/audio'] });
-      toast({
-        title: "Upload Complete",
-        description: "Audio file has been uploaded successfully."
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Upload Failed",
-        description: "There was an error uploading your audio file.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const handleFileSelect = (files: FileList | null) => {
+  const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
     
-    Array.from(files).forEach(file => {
-      if (file.type.startsWith('audio/')) {
-        uploadMutation.mutate(file);
-      } else {
+    setIsProcessing(true);
+    
+    try {
+      const promises = Array.from(files).map(async (file) => {
+        if (file.type.startsWith('audio/')) {
+          return await addAudioFile(file);
+        } else {
+          toast({
+            title: "Invalid File",
+            description: "Please select an audio file (MP3, WAV, FLAC, M4A).",
+            variant: "destructive"
+          });
+          return null;
+        }
+      });
+      
+      const results = await Promise.all(promises);
+      const successCount = results.filter(r => r !== null).length;
+      
+      if (successCount > 0) {
         toast({
-          title: "Invalid File",
-          description: "Please select an audio file (MP3, WAV, FLAC, M4A).",
-          variant: "destructive"
+          title: "Files Added",
+          description: `Successfully added ${successCount} audio file${successCount > 1 ? 's' : ''} to library.`
         });
       }
-    });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "There was an error processing your audio files.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -127,22 +123,26 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
       <div className="flex-1 p-4 overflow-y-auto">
         <h3 className="text-sm font-semibold mb-3 text-gray-300">Audio Library</h3>
         
-        {uploadMutation.isPending && (
+        {isProcessing && (
           <div className="bg-track-bg rounded p-3 mb-2">
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-              <span className="text-sm">Uploading...</span>
+              <span className="text-sm">Processing files...</span>
             </div>
           </div>
         )}
         
-        {audioFiles.map((file: any) => (
+        {audioFiles.map((file: LocalAudioFile) => (
           <div
             key={file.id}
-            className="bg-track-bg rounded p-3 mb-2 cursor-pointer hover:bg-gray-600 transition-colors"
+            className="bg-track-bg rounded p-3 mb-2 cursor-pointer hover:bg-gray-600 transition-colors group"
             draggable
             onDragStart={(e) => {
-              e.dataTransfer.setData('audio-file', JSON.stringify(file));
+              e.dataTransfer.setData('audio-file', JSON.stringify({
+                id: file.id,
+                name: file.name,
+                duration: file.duration
+              }));
             }}
             data-testid={`audio-file-${file.id}`}
           >
@@ -155,14 +155,28 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
                   {formatDuration(file.duration)}
                 </p>
               </div>
-              <GripVertical className="w-4 h-4 text-gray-500 ml-2" />
+              <div className="flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-6 h-6 p-0 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeAudioFile(file.id);
+                  }}
+                  data-testid={`button-delete-${file.id}`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+                <GripVertical className="w-4 h-4 text-gray-500" />
+              </div>
             </div>
           </div>
         ))}
         
-        {audioFiles.length === 0 && !uploadMutation.isPending && (
+        {audioFiles.length === 0 && !isProcessing && (
           <p className="text-sm text-gray-500 text-center py-8">
-            No audio files uploaded yet
+            No audio files added yet
           </p>
         )}
       </div>
