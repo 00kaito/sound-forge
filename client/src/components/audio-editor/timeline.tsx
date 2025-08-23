@@ -10,6 +10,7 @@ interface TimelineProps {
   playbackState: PlaybackState;
   projectData: ProjectData;
   onUpdateTrack: (trackId: string, updates: Partial<Track>) => void;
+  onAddClipToTrack: (trackId: string, clip: AudioClip) => void;
   onUpdateClip: (clipId: string, updates: Partial<AudioClip>) => void;
   onDeleteClip: (clipId: string) => void;
   formatTime: (seconds: number) => string;
@@ -20,6 +21,7 @@ export function Timeline({
   playbackState,
   projectData,
   onUpdateTrack,
+  onAddClipToTrack,
   onUpdateClip,
   onDeleteClip,
   formatTime
@@ -65,13 +67,8 @@ export function Timeline({
         name: audioFile.name
       };
       
-      // Add clip to track via parent callback
-      const track = tracks.find(t => t.id === trackId);
-      if (track) {
-        onUpdateTrack(trackId, {
-          clips: [...track.clips, newClip]
-        });
-      }
+      // Add clip to track via dedicated callback
+      onAddClipToTrack(trackId, newClip);
     } catch (error) {
       console.error('Error handling drop:', error);
     }

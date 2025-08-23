@@ -90,6 +90,12 @@ export function useAudioEngine() {
     return await engineRef.current.exportAudio(tracks, clips);
   }, []);
 
+  const setTimelineData = useCallback((tracks: Track[], clips: AudioClip[]) => {
+    if (engineRef.current) {
+      engineRef.current.setTimelineData(tracks, clips);
+    }
+  }, []);
+
   // Update playback state periodically
   useEffect(() => {
     if (!isInitialized || !engineRef.current) return;
@@ -125,6 +131,7 @@ export function useAudioEngine() {
     setTrackVolume,
     setTrackPan,
     createTrackGain,
-    exportAudio
+    exportAudio,
+    setTimelineData
   };
 }

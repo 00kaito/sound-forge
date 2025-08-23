@@ -20,7 +20,8 @@ export default function AudioEditor() {
     play, 
     pause, 
     stop, 
-    seekTo 
+    seekTo,
+    setTimelineData
   } = useAudioEngine();
   const { audioFiles, getAudioFile, loadAudioBuffer } = useLocalAudioStorage();
   const { toast } = useToast();
@@ -80,6 +81,14 @@ export default function AudioEditor() {
     }
   }, [audioError, toast]);
 
+  // Update timeline data in audio engine whenever tracks change
+  useEffect(() => {
+    if (isInitialized) {
+      const allClips = tracks.flatMap(track => track.clips);
+      setTimelineData(tracks, allClips);
+    }
+  }, [tracks, isInitialized, setTimelineData]);
+
   const addTrack = () => {
     const newTrack: Track = {
       id: `track-${tracks.length + 1}`,
@@ -99,7 +108,31 @@ export default function AudioEditor() {
     ));
   };
 
-  const addClipToTrack = (trackId: string, clip: AudioClip) => {
+  const addClipToTrack = async (trackId: string, clip: AudioClip) => {
+    // Load the audio file into both local storage and audio engine
+    const audioFile = getAudioFile(clip.audioFileId);
+    if (audioFile) {
+      try {
+        // Load buffer in local storage if not already loaded
+        if (!audioFile.audioBuffer) {
+          await loadAudioBuffer(audioFile);
+        }
+        
+        // Load into audio engine for playback
+        if (isInitialized) {
+          await loadAudioFile(clip.audioFileId, audioFile.file);
+        }
+      } catch (error) {
+        console.error('Failed to load audio buffer:', error);
+        toast({
+          title: "Audio Loading Error",
+          description: "Failed to load audio file for playback",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
     setTracks(tracks.map(track =>
       track.id === trackId
         ? { ...track, clips: [...track.clips, clip] }
@@ -239,6 +272,7 @@ export default function AudioEditor() {
           playbackState={playbackState}
           projectData={projectData}
           onUpdateTrack={updateTrack}
+          onAddClipToTrack={addClipToTrack}
           onUpdateClip={updateClip}
           onDeleteClip={deleteClip}
           formatTime={formatTime}

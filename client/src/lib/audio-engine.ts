@@ -15,6 +15,9 @@ export class AudioEngine {
   private animationFrame: number | null = null;
   private startTime = 0;
   private pauseTime = 0;
+  private currentSources: AudioBufferSourceNode[] = [];
+  private currentTracks: Track[] = [];
+  private currentClips: AudioClip[] = [];
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
@@ -98,6 +101,9 @@ export class AudioEngine {
 
     this.playbackState.isPlaying = true;
     this.startTime = this.audioContext.currentTime - this.pauseTime;
+    
+    // Start playing clips from current position
+    this.scheduleClips();
     this.updatePlayhead();
   }
 
@@ -106,6 +112,9 @@ export class AudioEngine {
 
     this.playbackState.isPlaying = false;
     this.pauseTime = this.audioContext.currentTime - this.startTime;
+    
+    // Stop all current sources
+    this.stopAllSources();
     
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
@@ -121,9 +130,19 @@ export class AudioEngine {
   }
 
   seekTo(time: number): void {
+    const wasPlaying = this.playbackState.isPlaying;
+    
+    if (wasPlaying) {
+      this.pause();
+    }
+    
     this.pauseTime = time;
     this.playbackState.currentTime = time;
     this.playbackState.playhead = time;
+    
+    if (wasPlaying) {
+      this.play();
+    }
   }
 
   private updatePlayhead(): void {
@@ -143,6 +162,114 @@ export class AudioEngine {
     if (this.masterGain) {
       this.masterGain.gain.value = volume;
     }
+  }
+
+  // New methods for timeline playback
+  setTimelineData(tracks: Track[], clips: AudioClip[]): void {
+    this.currentTracks = tracks;
+    this.currentClips = clips;
+    
+    console.log('Audio Engine: Timeline updated', {
+      tracks: tracks.length,
+      clips: clips.length,
+      loadedBuffers: this.tracks.size
+    });
+    
+    // Calculate total duration
+    if (clips.length > 0) {
+      this.playbackState.totalDuration = Math.max(
+        ...clips.map(clip => clip.startTime + clip.duration)
+      );
+    } else {
+      this.playbackState.totalDuration = 0;
+    }
+  }
+
+  private scheduleClips(): void {
+    if (!this.audioContext || !this.masterGain) return;
+    
+    const currentTime = this.pauseTime;
+    const audioContextStartTime = this.audioContext.currentTime;
+    
+    console.log('Audio Engine: Scheduling clips', {
+      currentTime,
+      totalClips: this.currentClips.length,
+      audioContextTime: audioContextStartTime
+    });
+    
+    // Stop any existing sources
+    this.stopAllSources();
+    
+    // Schedule clips that should be playing
+    for (const clip of this.currentClips) {
+      const clipStartTime = clip.startTime;
+      const clipEndTime = clip.startTime + clip.duration;
+      
+      // Skip clips that have already ended
+      if (currentTime >= clipEndTime) continue;
+      
+      const audioBuffer = this.tracks.get(clip.audioFileId);
+      if (!audioBuffer) {
+        console.warn('Audio Engine: Missing audio buffer for clip', clip.audioFileId);
+        continue;
+      }
+      
+      const track = this.currentTracks.find(t => t.id === clip.trackId);
+      if (!track || track.muted) continue;
+      
+      // Create audio source
+      const source = this.audioContext.createBufferSource();
+      const gainNode = this.audioContext.createGain();
+      const panNode = this.audioContext.createStereoPanner();
+      
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      gainNode.connect(panNode);
+      panNode.connect(this.masterGain);
+      
+      // Apply settings
+      gainNode.gain.value = clip.volume * track.volume;
+      panNode.pan.value = track.pan;
+      
+      // Calculate timing
+      let sourceStartTime = audioContextStartTime;
+      let sourceOffset = clip.offset;
+      let sourceDuration = clip.duration;
+      
+      if (currentTime > clipStartTime) {
+        // We're starting in the middle of this clip
+        const timeIntoClip = currentTime - clipStartTime;
+        sourceOffset += timeIntoClip;
+        sourceDuration -= timeIntoClip;
+      } else {
+        // Clip starts in the future
+        sourceStartTime += (clipStartTime - currentTime);
+      }
+      
+      // Start the source
+      if (sourceDuration > 0 && sourceOffset < audioBuffer.duration) {
+        console.log('Audio Engine: Starting source', {
+          clipName: clip.name,
+          startTime: sourceStartTime,
+          offset: sourceOffset,
+          duration: sourceDuration,
+          volume: gainNode.gain.value
+        });
+        source.start(sourceStartTime, sourceOffset, sourceDuration);
+        this.currentSources.push(source);
+      }
+    }
+  }
+  
+  private stopAllSources(): void {
+    for (const source of this.currentSources) {
+      try {
+        source.stop();
+      } catch (e) {
+        // Source might already be stopped
+      }
+    }
+    this.currentSources = [];
   }
 
   async exportAudio(tracks: Track[], clips: AudioClip[]): Promise<AudioBuffer> {
@@ -197,6 +324,7 @@ export class AudioEngine {
       cancelAnimationFrame(this.animationFrame);
     }
     
+    this.stopAllSources();
     this.trackGains.clear();
     this.tracks.clear();
     
