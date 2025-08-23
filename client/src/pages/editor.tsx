@@ -282,7 +282,7 @@ export default function AudioEditor() {
         duration: renderedBuffer.length / renderedBuffer.sampleRate
       });
 
-      const wavBlob = AudioConcatenator.audioBufferToWavBlob(renderedBuffer);
+      const wavBlob = await AudioConcatenator.audioBufferToWavBlob(renderedBuffer);
       AudioConcatenator.downloadBlob(wavBlob, `${settings.fileName}.${settings.format}`);
       
       toast({

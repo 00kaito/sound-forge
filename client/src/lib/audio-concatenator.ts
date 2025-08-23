@@ -33,9 +33,9 @@ export class AudioConcatenator {
   }
 
   /**
-   * Konwertuje AudioBuffer do formatu WAV Blob
+   * Konwertuje AudioBuffer do formatu WAV Blob (asynchronicznie)
    */
-  static audioBufferToWavBlob(buffer: AudioBuffer): Blob {
+  static async audioBufferToWavBlob(buffer: AudioBuffer): Promise<Blob> {
     console.log('WAV Export: Converting buffer', {
       channels: buffer.numberOfChannels,
       sampleRate: buffer.sampleRate,
@@ -102,21 +102,32 @@ export class AudioConcatenator {
     let maxSample = 0;
     let minSample = 0;
 
-    // Convert and write audio data
-    for (let i = 0; i < buffer.length; i++) {
-      for (let channel = 0; channel < numberOfChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        // Convert float [-1, 1] to 16-bit signed integer
-        const sample = Math.max(-1, Math.min(1, channelData[i]));
-        
-        // Track audio stats
-        if (Math.abs(sample) > 0.001) hasAudio = true;
-        maxSample = Math.max(maxSample, sample);
-        minSample = Math.min(minSample, sample);
-        
-        const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-        view.setInt16(offset, intSample, true);
-        offset += 2;
+    // Convert and write audio data in chunks to prevent UI blocking
+    const chunkSize = 44100; // Process ~1 second at a time
+    for (let start = 0; start < buffer.length; start += chunkSize) {
+      const end = Math.min(start + chunkSize, buffer.length);
+      
+      // Process chunk
+      for (let i = start; i < end; i++) {
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+          const channelData = buffer.getChannelData(channel);
+          // Convert float [-1, 1] to 16-bit signed integer
+          const sample = Math.max(-1, Math.min(1, channelData[i]));
+          
+          // Track audio stats
+          if (Math.abs(sample) > 0.001) hasAudio = true;
+          maxSample = Math.max(maxSample, sample);
+          minSample = Math.min(minSample, sample);
+          
+          const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          view.setInt16(offset, intSample, true);
+          offset += 2;
+        }
+      }
+      
+      // Yield control every chunk except the last one
+      if (end < buffer.length) {
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     }
 
