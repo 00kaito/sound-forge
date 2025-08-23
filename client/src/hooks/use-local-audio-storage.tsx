@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { LocalAudioFile } from '@/types/audio';
+import { AudioConcatenator } from '@/lib/audio-concatenator';
 
 export function useLocalAudioStorage() {
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
@@ -19,6 +20,63 @@ export function useLocalAudioStorage() {
     setAudioFiles(prev => [...prev, audioFile]);
     return audioFile;
   }, []);
+
+  const addMultipleAudioFiles = useCallback(async (files: File[]): Promise<LocalAudioFile[]> => {
+    const audioFiles: LocalAudioFile[] = [];
+    
+    for (const file of files) {
+      const duration = await getAudioDuration(file);
+      const audioFile: LocalAudioFile = {
+        id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        file,
+        name: file.name.split('.')[0],
+        duration
+      };
+      audioFiles.push(audioFile);
+    }
+    
+    setAudioFiles(prev => [...prev, ...audioFiles]);
+    return audioFiles;
+  }, []);
+
+  const concatenateFiles = useCallback(async (fileIds: string[], newName: string): Promise<LocalAudioFile | null> => {
+    try {
+      const filesToConcatenate = audioFiles.filter(f => fileIds.includes(f.id));
+      if (filesToConcatenate.length < 2) return null;
+
+      // Load audio buffers
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const buffers: AudioBuffer[] = [];
+      
+      for (const audioFile of filesToConcatenate) {
+        const arrayBuffer = await audioFile.file.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        buffers.push(audioBuffer);
+      }
+
+      // Concatenate buffers
+      const concatenatedBuffer = AudioConcatenator.concatenateAudioBuffers(audioContext, buffers);
+      
+      // Convert back to WAV file
+      const wavBlob = AudioConcatenator.audioBufferToWavBlob(concatenatedBuffer);
+      const wavFile = new File([wavBlob], `${newName}.wav`, { type: 'audio/wav' });
+      
+      // Add as new audio file
+      const newAudioFile: LocalAudioFile = {
+        id: `concat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        file: wavFile,
+        name: newName,
+        duration: concatenatedBuffer.duration,
+        audioBuffer: concatenatedBuffer
+      };
+      
+      setAudioFiles(prev => [...prev, newAudioFile]);
+      return newAudioFile;
+    } catch (error) {
+      console.error('Error concatenating files:', error);
+      return null;
+    }
+  }, [audioFiles]);
 
   const removeAudioFile = useCallback((id: string) => {
     setAudioFiles(prev => prev.filter(file => file.id !== id));
@@ -51,6 +109,8 @@ export function useLocalAudioStorage() {
     audioFiles,
     isLoading,
     addAudioFile,
+    addMultipleAudioFiles,
+    concatenateFiles,
     removeAudioFile,
     getAudioFile,
     loadAudioBuffer

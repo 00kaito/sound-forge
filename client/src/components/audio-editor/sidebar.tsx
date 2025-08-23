@@ -1,7 +1,10 @@
 import { useState, useRef } from 'react';
-import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X } from 'lucide-react';
+import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link2, FileAudio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Track, AudioClip, LocalAudioFile } from '@/types/audio';
 import { useToast } from '@/hooks/use-toast';
 import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
@@ -18,8 +21,11 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [concatenateModalOpen, setConcatenateModalOpen] = useState(false);
+  const [concatenateName, setConcatenateName] = useState('');
   const { toast } = useToast();
-  const { audioFiles, addAudioFile, removeAudioFile } = useLocalAudioStorage();
+  const { audioFiles, addAudioFile, removeAudioFile, concatenateFiles } = useLocalAudioStorage();
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
@@ -132,6 +138,129 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
           </div>
         )}
         
+        {/* Merge Files Button */}
+        {audioFiles.length > 1 && (
+          <div className="mb-3">
+            <Dialog open={concatenateModalOpen} onOpenChange={setConcatenateModalOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  data-testid="button-merge-files"
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  Merge Selected Files
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-panel-bg border-gray-700 text-white">
+                <DialogHeader>
+                  <DialogTitle>Merge Audio Files</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">
+                      Select files to merge (in order):
+                    </Label>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {audioFiles.map((file) => (
+                        <div key={file.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`merge-${file.id}`}
+                            checked={selectedFiles.has(file.id)}
+                            onCheckedChange={(checked) => {
+                              const newSelected = new Set(selectedFiles);
+                              if (checked) {
+                                newSelected.add(file.id);
+                              } else {
+                                newSelected.delete(file.id);
+                              }
+                              setSelectedFiles(newSelected);
+                            }}
+                            data-testid={`checkbox-merge-${file.id}`}
+                          />
+                          <Label htmlFor={`merge-${file.id}`} className="text-sm">
+                            {file.name} ({formatDuration(file.duration)})
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="merge-name" className="text-sm font-medium mb-2 block">
+                      Name for merged file:
+                    </Label>
+                    <Input
+                      id="merge-name"
+                      value={concatenateName}
+                      onChange={(e) => setConcatenateName(e.target.value)}
+                      placeholder="merged-audio"
+                      className="bg-track-bg border-gray-600"
+                      data-testid="input-merge-name"
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => {
+                        setConcatenateModalOpen(false);
+                        setSelectedFiles(new Set());
+                        setConcatenateName('');
+                      }}
+                      data-testid="button-cancel-merge"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      onClick={async () => {
+                        if (selectedFiles.size < 2) {
+                          toast({
+                            title: "Error",
+                            description: "Please select at least 2 files to merge.",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+                        
+                        const name = concatenateName || 'merged-audio';
+                        const fileIds = Array.from(selectedFiles);
+                        
+                        setIsProcessing(true);
+                        try {
+                          const result = await concatenateFiles(fileIds, name);
+                          if (result) {
+                            toast({
+                              title: "Files Merged",
+                              description: `Created merged file: ${name}`
+                            });
+                            setConcatenateModalOpen(false);
+                            setSelectedFiles(new Set());
+                            setConcatenateName('');
+                          } else {
+                            toast({
+                              title: "Merge Failed",
+                              description: "Unable to merge selected files.",
+                              variant: "destructive"
+                            });
+                          }
+                        } finally {
+                          setIsProcessing(false);
+                        }
+                      }}
+                      disabled={selectedFiles.size < 2 || isProcessing}
+                      data-testid="button-confirm-merge"
+                    >
+                      {isProcessing ? 'Merging...' : 'Merge Files'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+        
         {audioFiles.map((file: LocalAudioFile) => (
           <div
             key={file.id}
@@ -147,13 +276,16 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
             data-testid={`audio-file-${file.id}`}
           >
             <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" data-testid={`text-filename-${file.id}`}>
-                  {file.name}
-                </p>
-                <p className="text-xs text-gray-400" data-testid={`text-duration-${file.id}`}>
-                  {formatDuration(file.duration)}
-                </p>
+              <div className="flex items-center flex-1 min-w-0">
+                <FileAudio className="w-4 h-4 text-blue-400 mr-2 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" data-testid={`text-filename-${file.id}`}>
+                    {file.name}
+                  </p>
+                  <p className="text-xs text-gray-400" data-testid={`text-duration-${file.id}`}>
+                    {formatDuration(file.duration)}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center space-x-1">
                 <Button
@@ -175,9 +307,15 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
         ))}
         
         {audioFiles.length === 0 && !isProcessing && (
-          <p className="text-sm text-gray-500 text-center py-8">
-            No audio files added yet
-          </p>
+          <div className="text-center py-8">
+            <FileAudio className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">
+              No audio files added yet
+            </p>
+            <p className="text-xs text-gray-600 mt-1">
+              Drag & drop files or click above to add
+            </p>
+          </div>
         )}
       </div>
       

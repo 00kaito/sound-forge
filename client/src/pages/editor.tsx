@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
+import { AudioConcatenator } from '@/lib/audio-concatenator';
 import { Toolbar } from '@/components/audio-editor/toolbar';
 import { Sidebar } from '@/components/audio-editor/sidebar';
 import { Timeline } from '@/components/audio-editor/timeline';
@@ -129,24 +130,53 @@ export default function AudioEditor() {
         description: "Your audio is being processed..."
       });
 
+      // Calculate total duration
+      const allClips = tracks.flatMap(track => track.clips);
+      const totalDuration = Math.max(
+        ...allClips.map(clip => clip.startTime + clip.duration),
+        10 // Minimum 10 seconds
+      );
+
+      if (allClips.length === 0) {
+        toast({
+          title: "Nothing to Export",
+          description: "Please add some audio clips to the timeline first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Load audio buffers for all clips
       for (const track of tracks) {
         for (const clip of track.clips) {
           const audioFile = getAudioFile(clip.audioFileId);
-          if (audioFile) {
+          if (audioFile && !audioFile.audioBuffer) {
             await loadAudioBuffer(audioFile);
           }
         }
       }
 
-      // Get all clips from all tracks
-      const allClips = tracks.flatMap(track => track.clips);
+      // Create audio context for rendering
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       
-      // Export the audio
-      const audioBuffer = await exportAudio(tracks, allClips);
+      // Get audio buffer function
+      const getBufferFn = (id: string) => {
+        const audioFile = getAudioFile(id);
+        return audioFile?.audioBuffer;
+      };
+
+      // Render timeline to audio buffer using our advanced concatenator
+      const renderedBuffer = await AudioConcatenator.renderTimeline(
+        audioContext,
+        tracks,
+        allClips,
+        getBufferFn,
+        totalDuration
+      );
       
-      // Convert to desired format and download
-      await downloadAudioBuffer(audioBuffer, settings);
+      // Convert to WAV and download
+      const wavBlob = AudioConcatenator.audioBufferToWavBlob(renderedBuffer);
+      AudioConcatenator.downloadBlob(wavBlob, `${settings.fileName}.${settings.format}`);
       
       toast({
         title: "Export Complete",
@@ -162,64 +192,6 @@ export default function AudioEditor() {
     }
   };
 
-  const downloadAudioBuffer = async (audioBuffer: AudioBuffer, settings: ExportSettings) => {
-    // Convert AudioBuffer to WAV (basic implementation)
-    const numberOfChannels = audioBuffer.numberOfChannels;
-    const length = audioBuffer.length * numberOfChannels * 2 + 44;
-    const buffer = new ArrayBuffer(length);
-    const view = new DataView(buffer);
-    const channels = [];
-    let offset = 0;
-    let pos = 0;
-
-    // Write WAV header
-    setUint32(0x46464952); // "RIFF"
-    setUint32(length - 8); // file length - 8
-    setUint32(0x45564157); // "WAVE"
-    setUint32(0x20746d66); // "fmt " chunk
-    setUint32(16); // length = 16
-    setUint16(1); // PCM (uncompressed)
-    setUint16(numberOfChannels);
-    setUint32(audioBuffer.sampleRate);
-    setUint32(audioBuffer.sampleRate * 2 * numberOfChannels); // avg. bytes/sec
-    setUint16(numberOfChannels * 2); // block-align
-    setUint16(16); // 16-bit
-    setUint32(0x61746164); // "data" - chunk
-    setUint32(length - pos - 4); // chunk length
-
-    // Write interleaved data
-    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-      channels.push(audioBuffer.getChannelData(i));
-    }
-
-    while (pos < length) {
-      for (let i = 0; i < numberOfChannels; i++) {
-        const sample = Math.max(-1, Math.min(1, channels[i][offset]));
-        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-        pos += 2;
-      }
-      offset++;
-    }
-
-    function setUint16(data: number) {
-      view.setUint16(pos, data, true);
-      pos += 2;
-    }
-
-    function setUint32(data: number) {
-      view.setUint32(pos, data, true);
-      pos += 4;
-    }
-
-    // Create blob and download
-    const blob = new Blob([buffer], { type: 'audio/wav' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${settings.fileName}.${settings.format}`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-  };
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
