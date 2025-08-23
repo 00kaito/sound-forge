@@ -235,8 +235,17 @@ export class AudioConcatenator {
     }
 
     // Apply simple normalization to prevent clipping
+    console.log('Timeline Render: Starting normalization at 85%');
     onProgress?.(85);
-    await this.normalizeAudioBufferAsync(outputBuffer);
+    
+    try {
+      await this.normalizeAudioBufferAsync(outputBuffer);
+      console.log('Timeline Render: Normalization complete');
+    } catch (error) {
+      console.error('Timeline Render: Normalization failed', error);
+    }
+    
+    console.log('Timeline Render: Completing at 100%');
     onProgress?.(100);
     
     return outputBuffer;
@@ -350,12 +359,20 @@ export class AudioConcatenator {
    * Asynchroniczna wersja normalizacji AudioBuffer
    */
   private static async normalizeAudioBufferAsync(buffer: AudioBuffer): Promise<void> {
+    console.log('Normalize: Starting normalization', {
+      channels: buffer.numberOfChannels,
+      length: buffer.length,
+      duration: buffer.duration
+    });
+    
     let maxValue = 0;
     const chunkSize = 44100; // Process ~1 second at a time
+    let processedSamples = 0;
     
     // Find maximum absolute value in chunks
     for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
       const channelData = buffer.getChannelData(channel);
+      console.log(`Normalize: Processing channel ${channel}/${buffer.numberOfChannels}`);
       
       for (let start = 0; start < channelData.length; start += chunkSize) {
         const end = Math.min(start + chunkSize, channelData.length);
@@ -364,16 +381,21 @@ export class AudioConcatenator {
           maxValue = Math.max(maxValue, Math.abs(channelData[i]));
         }
         
-        // Yield every chunk
-        if (end < channelData.length) {
-          await this.yield();
+        processedSamples += (end - start);
+        
+        // Yield control periodically, but less frequently to avoid too much overhead
+        if (start % (chunkSize * 4) === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
     }
     
+    console.log('Normalize: Max value found:', maxValue);
+    
     // Apply normalization if needed
     if (maxValue > 1.0) {
       const scale = 0.95 / maxValue; // Leave some headroom
+      console.log('Normalize: Applying scale factor:', scale);
       
       for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
         const channelData = buffer.getChannelData(channel);
@@ -385,12 +407,17 @@ export class AudioConcatenator {
             channelData[i] *= scale;
           }
           
-          // Yield every chunk
-          if (end < channelData.length) {
-            await this.yield();
+          // Less frequent yielding during scaling
+          if (start % (chunkSize * 4) === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
           }
         }
       }
+      console.log('Normalize: Scaling complete');
+    } else {
+      console.log('Normalize: No scaling needed, maxValue within range');
     }
+    
+    console.log('Normalize: Normalization complete');
   }
 }
