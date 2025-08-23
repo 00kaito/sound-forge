@@ -57,7 +57,15 @@ export function WaveformCanvas({
       ctx.stroke();
     }
 
-    // Playhead is drawn in timeline ruler, not here
+    // Draw playhead through all tracks
+    if (playheadPosition >= 0 && playheadPosition <= width) {
+      ctx.strokeStyle = '#007acc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(playheadPosition, 0);
+      ctx.lineTo(playheadPosition, height);
+      ctx.stroke();
+    }
   };
 
   const handleClipMouseDown = (e: React.MouseEvent, clip: AudioClip) => {
@@ -208,7 +216,7 @@ export function WaveformCanvas({
                       }}
                     >
                       <div className="absolute top-1 left-1 text-xs text-white opacity-75">
-                        ↗
+                        ↗ {clip.fadeIn.toFixed(2)}s
                       </div>
                     </div>
                   )}
@@ -223,7 +231,7 @@ export function WaveformCanvas({
                       }}
                     >
                       <div className="absolute top-1 right-1 text-xs text-white opacity-75">
-                        ↘
+                        {clip.fadeOut.toFixed(2)}s ↘
                       </div>
                     </div>
                   )}
