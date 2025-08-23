@@ -8,45 +8,61 @@ export function useLocalAudioStorage() {
 
   const addAudioFile = useCallback(async (file: File): Promise<LocalAudioFile> => {
     console.log('LocalAudioStorage: Adding audio file', file.name);
-    // Get duration from audio file
-    const duration = await getAudioDuration(file);
     
-    const audioFile: LocalAudioFile = {
-      id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      file,
-      name: file.name.split('.')[0],
-      duration
-    };
-
-    console.log('LocalAudioStorage: Created file object', { id: audioFile.id, name: audioFile.name, duration });
-    
-    setAudioFiles(prev => {
-      const newFiles = [...prev, audioFile];
-      console.log('LocalAudioStorage: Updated files array to length', newFiles.length);
-      console.log('LocalAudioStorage: Files:', newFiles.map(f => ({ id: f.id, name: f.name })));
-      return newFiles;
-    });
-    
-    console.log('LocalAudioStorage: File added successfully');
-    return audioFile;
-  }, []);
-
-  const addMultipleAudioFiles = useCallback(async (files: File[]): Promise<LocalAudioFile[]> => {
-    const audioFiles: LocalAudioFile[] = [];
-    
-    for (const file of files) {
+    try {
+      // Get duration from audio file with error handling
       const duration = await getAudioDuration(file);
+      
       const audioFile: LocalAudioFile = {
         id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         file,
         name: file.name.split('.')[0],
         duration
       };
-      audioFiles.push(audioFile);
+
+      console.log('LocalAudioStorage: Created file object', { id: audioFile.id, name: audioFile.name, duration });
+      
+      setAudioFiles(prev => {
+        const newFiles = [...prev, audioFile];
+        console.log('LocalAudioStorage: Updated files array to length', newFiles.length);
+        console.log('LocalAudioStorage: Files:', newFiles.map(f => ({ id: f.id, name: f.name })));
+        return newFiles;
+      });
+      
+      console.log('LocalAudioStorage: File added successfully');
+      return audioFile;
+    } catch (error) {
+      console.error('LocalAudioStorage: Error adding audio file:', file.name, error);
+      throw error;
     }
+  }, []);
+
+  const addMultipleAudioFiles = useCallback(async (files: File[]): Promise<LocalAudioFile[]> => {
+    const audioFiles: LocalAudioFile[] = [];
     
-    setAudioFiles(prev => [...prev, ...audioFiles]);
-    return audioFiles;
+    try {
+      for (const file of files) {
+        try {
+          const duration = await getAudioDuration(file);
+          const audioFile: LocalAudioFile = {
+            id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            file,
+            name: file.name.split('.')[0],
+            duration
+          };
+          audioFiles.push(audioFile);
+        } catch (error) {
+          console.error('LocalAudioStorage: Error processing file:', file.name, error);
+          // Continue with other files
+        }
+      }
+      
+      setAudioFiles(prev => [...prev, ...audioFiles]);
+      return audioFiles;
+    } catch (error) {
+      console.error('LocalAudioStorage: Error adding multiple files:', error);
+      throw error;
+    }
   }, []);
 
   const concatenateFiles = useCallback(async (fileIds: string[], newName: string): Promise<LocalAudioFile | null> => {
@@ -105,18 +121,23 @@ export function useLocalAudioStorage() {
       return audioFile.audioBuffer;
     }
 
-    const arrayBuffer = await audioFile.file.arrayBuffer();
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
-    // Cache the buffer
-    setAudioFiles(prev => 
-      prev.map(file => 
-        file.id === audioFile.id ? { ...file, audioBuffer } : file
-      )
-    );
+    try {
+      const arrayBuffer = await audioFile.file.arrayBuffer();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      // Cache the buffer
+      setAudioFiles(prev => 
+        prev.map(file => 
+          file.id === audioFile.id ? { ...file, audioBuffer } : file
+        )
+      );
 
-    return audioBuffer;
+      return audioBuffer;
+    } catch (error) {
+      console.error('Error loading audio buffer for file:', audioFile.name, error);
+      throw error;
+    }
   }, []);
 
   return {
@@ -137,16 +158,36 @@ async function getAudioDuration(file: File): Promise<number> {
     const audio = document.createElement('audio');
     audio.preload = 'metadata';
     
-    audio.onloadedmetadata = () => {
-      window.URL.revokeObjectURL(audio.src);
-      resolve(audio.duration || 0);
+    const cleanup = () => {
+      if (audio.src) {
+        window.URL.revokeObjectURL(audio.src);
+      }
     };
     
-    audio.onerror = () => {
-      window.URL.revokeObjectURL(audio.src);
+    audio.onloadedmetadata = () => {
+      const duration = audio.duration || 0;
+      cleanup();
+      resolve(duration);
+    };
+    
+    audio.onerror = (error) => {
+      console.warn('Could not get audio duration:', error);
+      cleanup();
       resolve(0);
     };
     
-    audio.src = window.URL.createObjectURL(file);
+    // Add timeout to prevent hanging promises
+    setTimeout(() => {
+      console.warn('Audio duration detection timeout');
+      cleanup();
+      resolve(0);
+    }, 5000);
+    
+    try {
+      audio.src = window.URL.createObjectURL(file);
+    } catch (error) {
+      console.warn('Error creating object URL:', error);
+      resolve(0);
+    }
   });
 }

@@ -54,8 +54,8 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
         }
       });
       
-      const results = await Promise.all(promises);
-      const successCount = results.filter(r => r !== null).length;
+      const results = await Promise.allSettled(promises);
+      const successCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
       
       if (successCount > 0) {
         toast({
