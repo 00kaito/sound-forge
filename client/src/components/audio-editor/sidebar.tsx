@@ -15,9 +15,13 @@ interface SidebarProps {
   onAddClipToTrack: (trackId: string, clip: AudioClip) => void;
   currentTool: string;
   onToolChange: (tool: string) => void;
+  audioFiles: LocalAudioFile[];
+  addAudioFile: (file: File) => Promise<LocalAudioFile>;
+  removeAudioFile: (id: string) => void;
+  concatenateFiles: (fileIds: string[], newName: string) => Promise<LocalAudioFile | null>;
 }
 
-export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onToolChange }: SidebarProps) {
+export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onToolChange, audioFiles = [], addAudioFile, removeAudioFile, concatenateFiles }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -25,7 +29,7 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
   const [concatenateModalOpen, setConcatenateModalOpen] = useState(false);
   const [concatenateName, setConcatenateName] = useState('');
   const { toast } = useToast();
-  const { audioFiles, addAudioFile, removeAudioFile, concatenateFiles } = useLocalAudioStorage();
+  // Audio storage functions now passed as props
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;

@@ -23,7 +23,7 @@ export default function AudioEditor() {
     seekTo,
     setTimelineData
   } = useAudioEngine();
-  const { audioFiles, getAudioFile, loadAudioBuffer } = useLocalAudioStorage();
+  const { audioFiles, getAudioFile, loadAudioBuffer, addAudioFile, removeAudioFile, concatenateFiles } = useLocalAudioStorage();
   const { toast } = useToast();
   
   const [tracks, setTracks] = useState<Track[]>([
@@ -323,6 +323,10 @@ export default function AudioEditor() {
           onAddClipToTrack={addClipToTrack}
           currentTool={currentTool}
           onToolChange={setCurrentTool}
+          audioFiles={audioFiles}
+          addAudioFile={addAudioFile}
+          removeAudioFile={removeAudioFile}
+          concatenateFiles={concatenateFiles}
           data-testid="sidebar"
         />
         
