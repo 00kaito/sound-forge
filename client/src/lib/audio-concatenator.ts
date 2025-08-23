@@ -113,14 +113,15 @@ export class AudioConcatenator {
   }
 
   /**
-   * Renderuje timeline do jednego AudioBuffer
+   * Renderuje timeline do jednego AudioBuffer z asynchronicznym przetwarzaniem
    */
   static async renderTimeline(
     audioContext: AudioContext,
     tracks: any[],
     clips: any[],
     getAudioBuffer: (id: string) => AudioBuffer | undefined,
-    totalDuration: number
+    totalDuration: number,
+    onProgress?: (progress: number) => void
   ): Promise<AudioBuffer> {
     const sampleRate = audioContext.sampleRate;
     const numberOfChannels = 2; // Stereo
@@ -139,13 +140,22 @@ export class AudioConcatenator {
       channelData.fill(0);
     }
 
-    // Process each clip
+    // Process each clip with async yielding
+    const totalClips = clips.length;
+    let processedClips = 0;
+    
     for (const clip of clips) {
       const sourceBuffer = getAudioBuffer(clip.audioFileId);
-      if (!sourceBuffer) continue;
+      if (!sourceBuffer) {
+        processedClips++;
+        continue;
+      }
 
       const track = tracks.find(t => t.id === clip.trackId);
-      if (!track) continue;
+      if (!track) {
+        processedClips++;
+        continue;
+      }
 
       const startSample = Math.floor(clip.startTime * sampleRate);
       const clipDurationSamples = Math.min(
@@ -153,32 +163,104 @@ export class AudioConcatenator {
         sourceBuffer.length
       );
 
-      // Mix this clip into the output buffer
-      for (let channel = 0; channel < Math.min(numberOfChannels, sourceBuffer.numberOfChannels); channel++) {
-        const outputData = outputBuffer.getChannelData(channel);
-        const sourceData = sourceBuffer.getChannelData(
-          Math.min(channel, sourceBuffer.numberOfChannels - 1)
-        );
+      // Process this clip in chunks to avoid blocking UI
+      await this.processClipAsync(
+        outputBuffer, 
+        sourceBuffer, 
+        clip, 
+        track, 
+        startSample, 
+        clipDurationSamples, 
+        sampleRate,
+        numberOfChannels
+      );
+      
+      processedClips++;
+      const progress = Math.floor((processedClips / totalClips) * 80); // Reserve 20% for normalization
+      onProgress?.(progress);
+      
+      // Yield control to prevent freezing
+      await this.yield();
+    }
+
+    // Apply simple normalization to prevent clipping
+    onProgress?.(85);
+    await this.normalizeAudioBufferAsync(outputBuffer);
+    onProgress?.(100);
+    
+    return outputBuffer;
+  }
+
+  /**
+   * Processes a single clip asynchronously
+   */
+  private static async processClipAsync(
+    outputBuffer: AudioBuffer,
+    sourceBuffer: AudioBuffer,
+    clip: any,
+    track: any,
+    startSample: number,
+    clipDurationSamples: number,
+    sampleRate: number,
+    numberOfChannels: number
+  ): Promise<void> {
+    const chunkSize = 44100; // Process ~1 second at a time
+    const volume = clip.volume * track.volume * (track.muted ? 0 : 1);
+    
+    for (let channel = 0; channel < Math.min(numberOfChannels, sourceBuffer.numberOfChannels); channel++) {
+      const outputData = outputBuffer.getChannelData(channel);
+      const sourceData = sourceBuffer.getChannelData(
+        Math.min(channel, sourceBuffer.numberOfChannels - 1)
+      );
+      
+      // Process in chunks
+      for (let chunkStart = 0; chunkStart < clipDurationSamples; chunkStart += chunkSize) {
+        const chunkEnd = Math.min(chunkStart + chunkSize, clipDurationSamples);
         
-        const volume = clip.volume * track.volume * (track.muted ? 0 : 1);
-        
-        for (let i = 0; i < clipDurationSamples; i++) {
+        for (let i = chunkStart; i < chunkEnd; i++) {
           const outputIndex = startSample + i;
           if (outputIndex >= outputData.length) break;
           
           const sourceIndex = Math.floor(clip.offset * sampleRate) + i;
           if (sourceIndex >= sourceData.length) break;
           
+          // Apply fade effects
+          let sampleVolume = volume;
+          const clipTime = i / sampleRate;
+          
+          // Apply fade in
+          if (clip.fadeIn && clip.fadeIn > 0 && clipTime < clip.fadeIn) {
+            const fadeProgress = clipTime / clip.fadeIn;
+            sampleVolume *= fadeProgress;
+          }
+          
+          // Apply fade out
+          if (clip.fadeOut && clip.fadeOut > 0) {
+            const clipDuration = clipDurationSamples / sampleRate;
+            const timeFromEnd = clipDuration - clipTime;
+            if (timeFromEnd < clip.fadeOut) {
+              const fadeProgress = timeFromEnd / clip.fadeOut;
+              sampleVolume *= fadeProgress;
+            }
+          }
+          
           // Mix the sample (add with volume adjustment)
-          outputData[outputIndex] += sourceData[sourceIndex] * volume;
+          outputData[outputIndex] += sourceData[sourceIndex] * sampleVolume;
+        }
+        
+        // Yield every chunk
+        if (chunkEnd < clipDurationSamples) {
+          await this.yield();
         }
       }
     }
+  }
 
-    // Apply simple normalization to prevent clipping
-    this.normalizeAudioBuffer(outputBuffer);
-    
-    return outputBuffer;
+  /**
+   * Yield control to prevent UI blocking
+   */
+  private static async yield(): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, 0));
   }
 
   /**
@@ -203,6 +285,54 @@ export class AudioConcatenator {
         const channelData = buffer.getChannelData(channel);
         for (let i = 0; i < channelData.length; i++) {
           channelData[i] *= scale;
+        }
+      }
+    }
+  }
+
+  /**
+   * Asynchroniczna wersja normalizacji AudioBuffer
+   */
+  private static async normalizeAudioBufferAsync(buffer: AudioBuffer): Promise<void> {
+    let maxValue = 0;
+    const chunkSize = 44100; // Process ~1 second at a time
+    
+    // Find maximum absolute value in chunks
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+      const channelData = buffer.getChannelData(channel);
+      
+      for (let start = 0; start < channelData.length; start += chunkSize) {
+        const end = Math.min(start + chunkSize, channelData.length);
+        
+        for (let i = start; i < end; i++) {
+          maxValue = Math.max(maxValue, Math.abs(channelData[i]));
+        }
+        
+        // Yield every chunk
+        if (end < channelData.length) {
+          await this.yield();
+        }
+      }
+    }
+    
+    // Apply normalization if needed
+    if (maxValue > 1.0) {
+      const scale = 0.95 / maxValue; // Leave some headroom
+      
+      for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+        const channelData = buffer.getChannelData(channel);
+        
+        for (let start = 0; start < channelData.length; start += chunkSize) {
+          const end = Math.min(start + chunkSize, channelData.length);
+          
+          for (let i = start; i < end; i++) {
+            channelData[i] *= scale;
+          }
+          
+          // Yield every chunk
+          if (end < channelData.length) {
+            await this.yield();
+          }
         }
       }
     }

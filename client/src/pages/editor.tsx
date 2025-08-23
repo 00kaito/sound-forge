@@ -267,7 +267,11 @@ export default function AudioEditor() {
         tracks,
         allClips,
         getBufferFn,
-        totalDuration
+        totalDuration,
+        (progress) => {
+          // Progress will be updated in ExportModal automatically
+          console.log(`Export progress: ${progress}%`);
+        }
       );
       
       // Convert to WAV and download
