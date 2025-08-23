@@ -135,35 +135,42 @@ export default function AudioEditor() {
     
     // Load the audio file into both local storage and audio engine
     const audioFile = getAudioFile(clip.audioFileId);
-    if (audioFile) {
-      try {
-        // Load buffer in local storage if not already loaded
-        if (!audioFile.audioBuffer) {
-          console.log('Editor: Loading audio buffer for', clip.name);
-          await loadAudioBuffer(audioFile);
-        }
-        
-        // Load into audio engine for playback
-        if (isInitialized) {
-          console.log('Editor: Loading audio file into engine', clip.audioFileId);
-          try {
-            const buffer = await loadAudioFile(clip.audioFileId, audioFile.file);
-            console.log('Editor: Audio buffer loaded successfully', { id: clip.audioFileId, duration: buffer.duration });
-          } catch (error) {
-            console.error('Editor: Failed to load audio into engine:', error);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load audio buffer:', error);
-        toast({
-          title: "Audio Loading Error",
-          description: "Failed to load audio file for playback",
-          variant: "destructive"
-        });
-        return;
+    if (!audioFile) {
+      console.error('Editor: Audio file not found for clip', clip.audioFileId);
+      return;
+    }
+
+    try {
+      // Load buffer in local storage if not already loaded
+      if (!audioFile.audioBuffer) {
+        console.log('Editor: Loading audio buffer for local storage', clip.name);
+        await loadAudioBuffer(audioFile);
       }
+      
+      // Load into audio engine for playback - CRITICAL STEP
+      if (isInitialized) {
+        console.log('Editor: Loading audio file into engine', clip.audioFileId);
+        const buffer = await loadAudioFile(clip.audioFileId, audioFile.file);
+        console.log('Editor: Audio buffer loaded successfully into engine', { 
+          id: clip.audioFileId, 
+          duration: buffer.duration,
+          channels: buffer.numberOfChannels
+        });
+      } else {
+        console.error('Editor: Audio engine not initialized!');
+        throw new Error('Audio engine not initialized');
+      }
+    } catch (error) {
+      console.error('Editor: Failed to load audio:', error);
+      toast({
+        title: "Audio Loading Error",
+        description: `Failed to load ${clip.name} for playback`,
+        variant: "destructive"
+      });
+      return;
     }
     
+    // Only add clip after successful audio loading
     console.log('Editor: Adding clip to tracks state');
     setTracks(prevTracks => {
       const newTracks = prevTracks.map(track =>
@@ -172,16 +179,6 @@ export default function AudioEditor() {
           : track
       );
       console.log('Editor: New tracks state', newTracks.map(t => ({ id: t.id, clipCount: t.clips.length })));
-      
-      // Trigger timeline update after state change
-      setTimeout(() => {
-        if (isInitialized) {
-          const allClips = newTracks.flatMap(track => track.clips);
-          console.log('Editor: Updating timeline data with clips:', allClips.length);
-          setTimelineData(newTracks, allClips);
-        }
-      }, 100);
-      
       return newTracks;
     });
   };

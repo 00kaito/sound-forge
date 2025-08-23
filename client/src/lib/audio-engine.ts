@@ -185,7 +185,9 @@ export class AudioEngine {
     console.log('Audio Engine: Timeline updated', {
       tracks: tracks.length,
       clips: clips.length,
-      loadedBuffers: this.tracks.size
+      loadedBuffers: this.tracks.size,
+      clipIds: clips.map(c => c.audioFileId),
+      loadedBufferIds: Array.from(this.tracks.keys())
     });
     
     // Calculate total duration
@@ -224,8 +226,15 @@ export class AudioEngine {
       const audioBuffer = this.tracks.get(clip.audioFileId);
       if (!audioBuffer) {
         console.warn('Audio Engine: Missing audio buffer for clip', clip.audioFileId);
+        console.log('Audio Engine: Available buffers:', Array.from(this.tracks.keys()));
         continue;
       }
+      
+      console.log('Audio Engine: Found audio buffer for clip', {
+        clipId: clip.id,
+        audioFileId: clip.audioFileId,
+        bufferDuration: audioBuffer.duration
+      });
       
       const track = this.currentTracks.find(t => t.id === clip.trackId);
       if (!track || track.muted) continue;
