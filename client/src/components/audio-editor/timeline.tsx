@@ -53,6 +53,8 @@ export function Timeline({
       }
       
       const audioFile = JSON.parse(audioFileData);
+      console.log('Timeline: Parsed audio file data', audioFile);
+      
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const startTime = Math.max(0, x / pixelsPerSecond);
@@ -70,7 +72,13 @@ export function Timeline({
         name: audioFile.name
       };
       
-      console.log('Timeline: Adding clip to track', { trackId, clipName: newClip.name, startTime });
+      console.log('Timeline: Adding clip to track', { 
+        trackId, 
+        clipName: newClip.name, 
+        startTime, 
+        audioFileId: audioFile.id,
+        clipId: newClip.id
+      });
       
       // Add clip to track via dedicated callback
       onAddClipToTrack(trackId, newClip);

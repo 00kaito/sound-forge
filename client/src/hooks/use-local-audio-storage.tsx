@@ -83,7 +83,11 @@ export function useLocalAudioStorage() {
   }, []);
 
   const getAudioFile = useCallback((id: string): LocalAudioFile | undefined => {
-    return audioFiles.find(file => file.id === id);
+    console.log('LocalAudioStorage: getAudioFile called with ID', id);
+    console.log('LocalAudioStorage: Available files:', audioFiles.map(f => ({ id: f.id, name: f.name })));
+    const found = audioFiles.find(file => file.id === id);
+    console.log('LocalAudioStorage: Found file:', found ? { id: found.id, name: found.name } : 'NOT FOUND');
+    return found;
   }, [audioFiles]);
 
   const loadAudioBuffer = useCallback(async (audioFile: LocalAudioFile): Promise<AudioBuffer> => {

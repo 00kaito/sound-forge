@@ -134,11 +134,22 @@ export default function AudioEditor() {
     console.log('Editor: addClipToTrack called', { trackId, clipId: clip.id, clipName: clip.name });
     
     // Load the audio file into both local storage and audio engine
+    console.log('Editor: Looking for audio file with ID', clip.audioFileId);
+    console.log('Editor: Available audio files:', audioFiles.map(f => ({ id: f.id, name: f.name })));
+    
     const audioFile = getAudioFile(clip.audioFileId);
     if (!audioFile) {
       console.error('Editor: Audio file not found for clip', clip.audioFileId);
+      console.error('Editor: Available audio file IDs:', audioFiles.map(f => f.id));
+      toast({
+        title: "Audio File Error",
+        description: `Audio file not found: ${clip.name}`,
+        variant: "destructive"
+      });
       return;
     }
+    
+    console.log('Editor: Found audio file', { id: audioFile.id, name: audioFile.name });
 
     try {
       // Load buffer in local storage if not already loaded
