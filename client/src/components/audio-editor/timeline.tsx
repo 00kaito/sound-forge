@@ -392,6 +392,13 @@ export function Timeline({
             title="Click to seek to position"
           />
           
+          {/* Cursor Time Display - positioned on timeline ruler */}
+          {mousePosition !== null && (
+            <div className="absolute top-1 left-2 bg-gray-900 text-white px-2 py-1 rounded text-xs font-mono border border-gray-500 pointer-events-none z-20 shadow-lg">
+              {formatTime(mousePosition)}
+            </div>
+          )}
+          
           {/* Playhead */}
           <div
             className="absolute top-0 w-0.5 bg-blue-500 z-10 pointer-events-none"
@@ -466,12 +473,6 @@ export function Timeline({
             />
           </div>
           
-          {/* Cursor Time Display */}
-          {mousePosition !== null && (
-            <div className="absolute top-2 left-2 bg-gray-800 text-white px-3 py-1 rounded-md text-sm font-mono border border-gray-600 pointer-events-none z-10">
-              {formatTime(mousePosition)}
-            </div>
-          )}
           
           {/* Zoom Hint */}
           {isDragging && (
