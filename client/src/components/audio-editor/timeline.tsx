@@ -91,7 +91,11 @@ export function Timeline({
     updateZoom(zoomLevel / 1.5);
   };
   
-  const handleAutoFit = () => {
+  const handleAutoFit = (e?: React.MouseEvent) => {
+    // Prevent event propagation to avoid interfering with mouse handlers
+    e?.preventDefault();
+    e?.stopPropagation();
+    
     // Find all clips from all tracks
     const allClips = tracks.flatMap(track => track.clips);
     if (allClips.length === 0) {
@@ -101,13 +105,16 @@ export function Timeline({
     
     // Find the furthest end time across all tracks
     const maxEndTime = Math.max(...allClips.map(clip => clip.startTime + clip.duration));
-    const containerWidth = timelineContainerRef.current?.clientWidth || 800;
     
-    // Calculate available width (subtract sidebar width and margins)
-    const availableWidth = containerWidth - 250; // 250px for sidebar and margins
+    // Get the actual timeline area width (not the whole container)
+    const timelineArea = timelineContainerRef.current?.querySelector('.flex-1.overflow-x-auto') as HTMLElement;
+    const availableWidth = timelineArea?.clientWidth || 800;
+    
+    // Add some padding so content isn't cramped against edges
+    const paddedWidth = availableWidth - 100; // 100px padding
     
     // Calculate target pixels per second to fit all content
-    const targetPixelsPerSecond = availableWidth / maxEndTime;
+    const targetPixelsPerSecond = paddedWidth / maxEndTime;
     
     // Convert to zoom percentage (100 pixels per second = 100% zoom)
     const newZoom = Math.max(25, Math.min(800, targetPixelsPerSecond));
@@ -278,6 +285,8 @@ export function Timeline({
               size="sm"
               className="text-gray-300 border-gray-600 hover:bg-gray-700"
               title="Auto-fit to content"
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
             >
               <Maximize2 className="w-4 h-4" />
             </Button>
