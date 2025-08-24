@@ -16,6 +16,13 @@ interface TimelineProps {
   formatTime: (seconds: number) => string;
   onUpdateProjectData?: (updates: Partial<ProjectData>) => void;
   onSeekTo?: (time: number) => void;
+  currentTool?: string;
+  onSplitClip?: (clipId: string, splitTime: number) => void;
+  onCutRegion?: (trackId: string, startTime: number, endTime: number) => void;
+  selectionStart?: number | null;
+  selectionEnd?: number | null;
+  selectedTrackId?: string | null;
+  onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
 }
 
 export function Timeline({
@@ -28,7 +35,14 @@ export function Timeline({
   onDeleteClip,
   formatTime,
   onUpdateProjectData,
-  onSeekTo
+  onSeekTo,
+  currentTool,
+  onSplitClip,
+  onCutRegion,
+  selectionStart,
+  selectionEnd,
+  selectedTrackId,
+  onSelectionChange
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -324,6 +338,13 @@ export function Timeline({
               onTrackDrop={handleTrackDrop}
               onUpdateClip={onUpdateClip}
               onDeleteClip={onDeleteClip}
+              currentTool={currentTool}
+              onSplitClip={onSplitClip}
+              onCutRegion={onCutRegion}
+              selectionStart={selectionStart}
+              selectionEnd={selectionEnd}
+              selectedTrackId={selectedTrackId}
+              onSelectionChange={onSelectionChange}
               data-testid="waveform-canvas"
             />
           </div>

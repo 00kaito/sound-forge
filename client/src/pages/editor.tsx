@@ -69,6 +69,9 @@ export default function AudioEditor() {
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [currentTool, setCurrentTool] = useState<string>('select');
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   useEffect(() => {
     initialize();
@@ -267,6 +270,145 @@ export default function AudioEditor() {
         clip.id === clipId ? { ...clip, ...updates } : clip
       )
     })));
+  };
+
+  // Split clip at a specific time (for cut tool)
+  const splitClip = (clipId: string, splitTime: number) => {
+    setTracks(tracks.map(track => ({
+      ...track,
+      clips: track.clips.flatMap(clip => {
+        if (clip.id !== clipId) return clip;
+        
+        // Calculate split position relative to clip start
+        const relativeTime = splitTime - clip.startTime;
+        if (relativeTime <= 0 || relativeTime >= clip.duration) return clip;
+        
+        // Create two new clips
+        const firstClip: AudioClip = {
+          ...clip,
+          id: `${clip.id}_part1`,
+          duration: relativeTime,
+          fadeOut: 0 // Reset fade out for first part
+        };
+        
+        const secondClip: AudioClip = {
+          ...clip,
+          id: `${clip.id}_part2`,
+          startTime: splitTime,
+          offset: clip.offset + relativeTime,
+          duration: clip.duration - relativeTime,
+          fadeIn: 0 // Reset fade in for second part
+        };
+        
+        return [firstClip, secondClip];
+      })
+    })));
+    
+    toast({
+      title: "Clip Split",
+      description: "Clip has been split at the selected position"
+    });
+  };
+
+  // Cut out selected region (for cut tool)
+  const cutRegion = (trackId: string, startTime: number, endTime: number) => {
+    if (startTime >= endTime) return;
+    
+    setTracks(tracks.map(track => {
+      if (track.id !== trackId) return track;
+      
+      return {
+        ...track,
+        clips: track.clips.flatMap(clip => {
+          const clipStart = clip.startTime;
+          const clipEnd = clip.startTime + clip.duration;
+          
+          // If clip doesn't overlap with cut region, keep it
+          if (clipEnd <= startTime || clipStart >= endTime) return clip;
+          
+          // If clip is completely within cut region, remove it
+          if (clipStart >= startTime && clipEnd <= endTime) return [];
+          
+          // If cut region is completely within clip, split into two parts
+          if (clipStart < startTime && clipEnd > endTime) {
+            const firstPart: AudioClip = {
+              ...clip,
+              id: `${clip.id}_before_cut`,
+              duration: startTime - clipStart,
+              fadeOut: 0
+            };
+            
+            const secondPart: AudioClip = {
+              ...clip,
+              id: `${clip.id}_after_cut`,
+              startTime: startTime, // Moved to where cut ends
+              offset: clip.offset + (endTime - clipStart),
+              duration: clipEnd - endTime,
+              fadeIn: 0
+            };
+            
+            return [firstPart, secondPart];
+          }
+          
+          // If cut overlaps beginning of clip
+          if (startTime <= clipStart && endTime > clipStart && endTime < clipEnd) {
+            return {
+              ...clip,
+              startTime: endTime,
+              offset: clip.offset + (endTime - clipStart),
+              duration: clipEnd - endTime,
+              fadeIn: 0
+            };
+          }
+          
+          // If cut overlaps end of clip
+          if (startTime > clipStart && startTime < clipEnd && endTime >= clipEnd) {
+            return {
+              ...clip,
+              duration: startTime - clipStart,
+              fadeOut: 0
+            };
+          }
+          
+          return clip;
+        })
+      };
+    }));
+    
+    toast({
+      title: "Region Cut",
+      description: `Cut region from ${startTime.toFixed(2)}s to ${endTime.toFixed(2)}s`
+    });
+  };
+
+  // Remove audio file and all associated clips
+  const handleRemoveAudioFile = (audioFileId: string) => {
+    // Count clips that will be removed
+    let removedClipsCount = 0;
+    tracks.forEach(track => {
+      track.clips.forEach(clip => {
+        if (clip.audioFileId === audioFileId) {
+          removedClipsCount++;
+        }
+      });
+    });
+    
+    // Remove clips from tracks
+    setTracks(tracks.map(track => ({
+      ...track,
+      clips: track.clips.filter(clip => clip.audioFileId !== audioFileId)
+    })));
+    
+    // Remove from audio storage
+    removeAudioFile(audioFileId, (count) => {
+      if (removedClipsCount > 0) {
+        toast({
+          title: "Audio File Removed",
+          description: `Removed audio file and ${removedClipsCount} clip(s) from tracks`,
+          variant: "destructive"
+        });
+      }
+    });
   };
   
   const updateProjectData = (updates: Partial<ProjectData>) => {
@@ -562,7 +704,7 @@ export default function AudioEditor() {
           onToolChange={setCurrentTool}
           audioFiles={audioFiles}
           addAudioFile={addAudioFile}
-          removeAudioFile={removeAudioFile}
+          removeAudioFile={handleRemoveAudioFile}
           concatenateFiles={concatenateFiles}
           data-testid="sidebar"
         />
@@ -578,6 +720,17 @@ export default function AudioEditor() {
           formatTime={formatTime}
           onUpdateProjectData={updateProjectData}
           onSeekTo={seekTo}
+          currentTool={currentTool}
+          onSplitClip={splitClip}
+          onCutRegion={cutRegion}
+          selectionStart={selectionStart}
+          selectionEnd={selectionEnd}
+          selectedTrackId={selectedTrackId}
+          onSelectionChange={(start: number | null, end: number | null, trackId: string | null) => {
+            setSelectionStart(start);
+            setSelectionEnd(end);
+            setSelectedTrackId(trackId);
+          }}
           data-testid="timeline"
         />
       </div>

@@ -104,8 +104,13 @@ export function useLocalAudioStorage() {
     }
   }, [audioFiles]);
 
-  const removeAudioFile = useCallback((id: string) => {
+  const removeAudioFile = useCallback((id: string, onClipsRemoved?: (removedClips: number) => void) => {
     setAudioFiles(prev => prev.filter(file => file.id !== id));
+    
+    // Notify about clips that will be orphaned - parent component should handle removing them
+    if (onClipsRemoved) {
+      onClipsRemoved(0); // Will be filled by parent component logic
+    }
   }, []);
 
   const getAudioFile = useCallback((id: string): LocalAudioFile | undefined => {
