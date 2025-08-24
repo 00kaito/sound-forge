@@ -14,9 +14,9 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
 
   useEffect(() => {
     drawWaveform();
-  }, [clip, width, height]);
+  }, [clip.audioFileId, clip.offset, clip.duration, width, height]);
 
-  const drawWaveform = async () => {
+  const drawWaveform = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -33,7 +33,7 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
       return;
     }
 
-    // Draw real waveform from audio buffer
+    // Draw real waveform from audio buffer - content stays fixed regardless of clip position
     drawRealWaveform(ctx, audioFile.audioBuffer, width, height, clip.offset, clip.duration);
   };
 
