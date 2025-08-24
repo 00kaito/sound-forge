@@ -328,40 +328,12 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
         )}
       </div>
       
-      {/* Tools Panel */}
+      {/* Add Track Button */}
       <div className="p-4 border-t border-gray-700">
-        <h3 className="text-sm font-semibold mb-3 text-gray-300">Tools</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {tools.map((tool) => (
-            <Button
-              key={tool.id}
-              variant={currentTool === tool.id ? "default" : "secondary"}
-              size="sm"
-              className={`h-12 flex flex-col items-center justify-center text-xs ${
-                currentTool === tool.id 
-                  ? 'bg-blue-600 hover:bg-blue-700' 
-                  : 'bg-track-bg hover:bg-gray-600'
-              }`}
-              onClick={() => {
-                // Toggle off if tool is already selected
-                if (currentTool === tool.id) {
-                  onToolChange('select');
-                } else {
-                  onToolChange(tool.id);
-                }
-              }}
-              data-testid={`button-tool-${tool.id}`}
-            >
-              <tool.icon className="w-4 h-4 mb-1" />
-              {tool.label}
-            </Button>
-          ))}
-        </div>
-        
         <Button
           onClick={onAddTrack}
           variant="secondary"
-          className="w-full mt-4 bg-gray-700 hover:bg-gray-600"
+          className="w-full bg-gray-700 hover:bg-gray-600"
           data-testid="button-add-track"
         >
           <Plus className="w-4 h-4 mr-2" />

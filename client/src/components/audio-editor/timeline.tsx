@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Plus, Minus, Maximize2 } from 'lucide-react';
+import { Plus, Minus, Maximize2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TrackHeader } from '@/components/audio-editor/track-header';
 import { WaveformCanvas } from '@/components/audio-editor/waveform-canvas';
@@ -23,6 +23,7 @@ interface TimelineProps {
   selectionEnd?: number | null;
   selectedTrackId?: string | null;
   onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
+  onToolChange?: (tool: string) => void;
 }
 
 export function Timeline({
@@ -42,7 +43,8 @@ export function Timeline({
   selectionStart,
   selectionEnd,
   selectedTrackId,
-  onSelectionChange
+  onSelectionChange,
+  onToolChange
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -244,37 +246,65 @@ export function Timeline({
     >
       {/* Zoom Controls */}
       <div className="flex items-center justify-between p-2 border-b border-gray-700">
-        <div className="flex items-center space-x-2">
-          <Button
-            onClick={handleZoomOut}
-            variant="outline"
-            size="sm"
-            className="text-gray-300 border-gray-600 hover:bg-gray-700"
-            title="Zoom Out"
-          >
-            <Minus className="w-4 h-4" />
-          </Button>
-          <span className="text-sm text-gray-300 min-w-[60px] text-center">
-            {Math.round(zoomLevel)}%
-          </span>
-          <Button
-            onClick={handleZoomIn}
-            variant="outline"
-            size="sm"
-            className="text-gray-300 border-gray-600 hover:bg-gray-700"
-            title="Zoom In"
-          >
-            <Plus className="w-4 h-4" />
-          </Button>
-          <Button
-            onClick={handleAutoFit}
-            variant="outline"
-            size="sm"
-            className="text-gray-300 border-gray-600 hover:bg-gray-700"
-            title="Auto-fit to content"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </Button>
+        <div className="flex items-center space-x-4">
+          {/* Zoom Controls */}
+          <div className="flex items-center space-x-2">
+            <Button
+              onClick={handleZoomOut}
+              variant="outline"
+              size="sm"
+              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              title="Zoom Out"
+            >
+              <Minus className="w-4 h-4" />
+            </Button>
+            <span className="text-sm text-gray-300 min-w-[60px] text-center">
+              {Math.round(zoomLevel)}%
+            </span>
+            <Button
+              onClick={handleZoomIn}
+              variant="outline"
+              size="sm"
+              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              title="Zoom In"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+            <Button
+              onClick={handleAutoFit}
+              variant="outline"
+              size="sm"
+              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              title="Auto-fit to content"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Tools */}
+          <div className="flex items-center space-x-2 border-l border-gray-600 pl-4">
+            <Button
+              onClick={() => {
+                // Toggle off if tool is already selected
+                if (currentTool === 'cut') {
+                  onToolChange?.('select');
+                } else {
+                  onToolChange?.('cut');
+                }
+              }}
+              variant={currentTool === 'cut' ? "default" : "outline"}
+              size="sm"
+              className={`${
+                currentTool === 'cut' 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                  : 'text-gray-300 border-gray-600 hover:bg-gray-700'
+              }`}
+              title="Cut Tool - Click clips to split or drag to select region"
+              data-testid="button-tool-cut"
+            >
+              <Scissors className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
         <div className="text-xs text-gray-400">
           Shift + drag to zoom

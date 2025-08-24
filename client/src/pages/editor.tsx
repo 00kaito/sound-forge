@@ -731,6 +731,7 @@ export default function AudioEditor() {
             setSelectionEnd(end);
             setSelectedTrackId(trackId);
           }}
+          onToolChange={setCurrentTool}
           data-testid="timeline"
         />
       </div>
