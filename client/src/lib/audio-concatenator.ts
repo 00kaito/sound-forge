@@ -248,17 +248,31 @@ export class AudioConcatenator {
         sourceBuffer.length
       );
 
-      // Process this clip in chunks to avoid blocking UI
-      await this.processClipAsync(
-        outputBuffer, 
-        sourceBuffer, 
-        clip, 
-        track, 
-        startSample, 
-        clipDurationSamples, 
-        sampleRate,
-        numberOfChannels
-      );
+      // Process this clip - copy audio data to output buffer
+      console.log('Timeline Render: Copying audio data', {
+        startSample,
+        clipDurationSamples,
+        outputLength: outputBuffer.length,
+        sourceLength: sourceBuffer.length
+      });
+      
+      // Copy audio data from source to output buffer
+      for (let channel = 0; channel < Math.min(numberOfChannels, sourceBuffer.numberOfChannels); channel++) {
+        const sourceChannelData = sourceBuffer.getChannelData(channel);
+        const outputChannelData = outputBuffer.getChannelData(channel);
+        
+        // Copy sample by sample with bounds checking
+        for (let i = 0; i < clipDurationSamples; i++) {
+          const outputIndex = startSample + i;
+          if (outputIndex < outputBuffer.length && i < sourceBuffer.length) {
+            // Apply track volume (default 1.0)
+            const volume = track.volume || 1.0;
+            outputChannelData[outputIndex] = sourceChannelData[i] * volume;
+          }
+        }
+      }
+      
+      console.log('Timeline Render: Audio data copied successfully');
       
       processedClips++;
       const progress = Math.floor((processedClips / totalClips) * 80); // Reserve 20% for normalization
