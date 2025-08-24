@@ -23,7 +23,7 @@ export default function AudioEditor() {
     seekTo,
     setTimelineData
   } = useAudioEngine();
-  const { audioFiles, getAudioFile, loadAudioBuffer, addAudioFile, removeAudioFile, concatenateFiles } = useLocalAudioStorage();
+  const { audioFiles, getAudioFile, loadAudioBuffer, addAudioFile, removeAudioFile, concatenateFiles, exportProject, importProject } = useLocalAudioStorage();
   const { toast } = useToast();
   
   const [tracks, setTracks] = useState<Track[]>([
@@ -326,6 +326,87 @@ export default function AudioEditor() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
   };
 
+  const handleSaveProject = () => {
+    try {
+      const projectData = {
+        timeline: {
+          duration: Math.max(...tracks.flatMap(track => 
+            track.clips.map(clip => clip.startTime + clip.duration)
+          )),
+          tracks,
+          clips: tracks.flatMap(track => track.clips)
+        },
+        tracks,
+        clips: tracks.flatMap(track => track.clips)
+      };
+      
+      const projectName = prompt('Enter project name:', 'my-audio-project') || 'my-audio-project';
+      exportProject(projectData, projectName);
+      
+      toast({
+        title: "Project Saved",
+        description: `Project "${projectName}" has been exported successfully.`
+      });
+    } catch (error) {
+      console.error('Error saving project:', error);
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "There was an error saving your project."
+      });
+    }
+  };
+
+  const handleOpenProject = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.audioforge.json,.json';
+    input.style.display = 'none';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        const projectData = await importProject(file);
+        
+        // Load project data
+        if (projectData.tracks) {
+          setTracks(projectData.tracks);
+        }
+        
+        // Check if required audio files are available
+        const missingFiles = projectData.audioFiles?.filter((reqFile: any) => 
+          !audioFiles.find(audioFile => audioFile.name === reqFile.originalName)
+        ) || [];
+        
+        if (missingFiles.length > 0) {
+          toast({
+            variant: "destructive", 
+            title: "Missing Audio Files",
+            description: `Please add these files: ${missingFiles.map((f: any) => f.originalName).join(', ')}`
+          });
+        } else {
+          toast({
+            title: "Project Loaded",
+            description: `Project "${projectData.projectName}" loaded successfully.`
+          });
+        }
+      } catch (error) {
+        console.error('Error loading project:', error);
+        toast({
+          variant: "destructive",
+          title: "Import Failed", 
+          description: "There was an error loading the project file."
+        });
+      }
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+  };
+
   if (!isInitialized) {
     return (
       <div className="h-screen flex items-center justify-center bg-editor-bg text-white">
@@ -347,6 +428,8 @@ export default function AudioEditor() {
         onPause={pause}
         onStop={stop}
         onSeekToStart={() => seekTo(0)}
+        onSaveProject={handleSaveProject}
+        onOpenProject={handleOpenProject}
         data-testid="toolbar"
       />
       

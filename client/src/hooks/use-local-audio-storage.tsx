@@ -84,7 +84,7 @@ export function useLocalAudioStorage() {
       const concatenatedBuffer = AudioConcatenator.concatenateAudioBuffers(audioContext, buffers);
       
       // Convert back to WAV file
-      const wavBlob = AudioConcatenator.audioBufferToWavBlob(concatenatedBuffer);
+      const wavBlob = await AudioConcatenator.audioBufferToWavBlob(concatenatedBuffer);
       const wavFile = new File([wavBlob], `${newName}.wav`, { type: 'audio/wav' });
       
       // Add as new audio file
@@ -140,6 +140,61 @@ export function useLocalAudioStorage() {
     }
   }, []);
 
+  const exportProject = useCallback((projectData: any, projectName: string = 'my-project') => {
+    // Create project export object
+    const exportData = {
+      projectName,
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      audioForgeProject: true,
+      timeline: projectData.timeline,
+      tracks: projectData.tracks,
+      clips: projectData.clips,
+      audioFiles: audioFiles.map(file => ({
+        id: file.id,
+        originalName: file.name,
+        duration: file.duration,
+        // Don't include the actual file data
+      }))
+    };
+
+    // Download as JSON file
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
+      type: 'application/json' 
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName}.audioforge.json`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('Project exported:', projectName);
+  }, [audioFiles]);
+
+  const importProject = useCallback(async (file: File): Promise<any> => {
+    try {
+      const text = await file.text();
+      const projectData = JSON.parse(text);
+      
+      // Validate project format
+      if (!projectData.audioForgeProject) {
+        throw new Error('Invalid AudioForge project file');
+      }
+
+      console.log('Project imported:', projectData.projectName);
+      console.log('Required audio files:', projectData.audioFiles);
+      
+      return projectData;
+    } catch (error) {
+      console.error('Error importing project:', error);
+      throw error;
+    }
+  }, []);
+
   return {
     audioFiles,
     isLoading,
@@ -148,7 +203,9 @@ export function useLocalAudioStorage() {
     concatenateFiles,
     removeAudioFile,
     getAudioFile,
-    loadAudioBuffer
+    loadAudioBuffer,
+    exportProject,
+    importProject
   };
 }
 

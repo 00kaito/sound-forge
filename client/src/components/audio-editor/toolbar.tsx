@@ -10,6 +10,8 @@ interface ToolbarProps {
   onPause?: () => void;
   onStop?: () => void;
   onSeekToStart?: () => void;
+  onSaveProject?: () => void;
+  onOpenProject?: () => void;
 }
 
 export function Toolbar({ 
@@ -19,7 +21,9 @@ export function Toolbar({
   onPlay,
   onPause, 
   onStop,
-  onSeekToStart
+  onSeekToStart,
+  onSaveProject,
+  onOpenProject
 }: ToolbarProps) {
   const handlePlay = () => {
     if (playbackState.isPlaying) {
@@ -46,6 +50,7 @@ export function Toolbar({
         </h1>
         <div className="hidden md:flex space-x-2">
           <Button
+            onClick={onOpenProject}
             variant="secondary"
             size="sm"
             className="bg-gray-700 hover:bg-gray-600"
@@ -55,6 +60,7 @@ export function Toolbar({
             Open Project
           </Button>
           <Button
+            onClick={onSaveProject}
             variant="secondary"
             size="sm"
             className="bg-gray-700 hover:bg-gray-600"
