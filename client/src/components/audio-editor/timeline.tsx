@@ -184,18 +184,6 @@ export function Timeline({
     }
   };
 
-  const handleTimelineMouseMove = (e: React.MouseEvent) => {
-    // Track mouse position for cursor time display
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
-    setMousePosition(timeAtCursor);
-  };
-
-  const handleTimelineMouseLeave = () => {
-    setMousePosition(null);
-    setTracksCursorPosition(null);
-  };
 
   // Scroll wheel zoom handler
   const handleWheel = (e: React.WheelEvent) => {
@@ -444,8 +432,20 @@ export function Timeline({
             width={800}
             height={48}
             onClick={handleTimelineClick}
-            onMouseMove={handleTimelineMouseMove}
-            onMouseLeave={handleTimelineMouseLeave}
+            onMouseMove={(e) => {
+              // Calculate time position for timeline ruler
+              const rect = e.currentTarget.getBoundingClientRect();
+              const mouseX = e.clientX - rect.left;
+              const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
+              setMousePosition(timeAtCursor);
+              
+              // Also update tracks cursor position to stay in sync
+              setTracksCursorPosition(mouseX);
+            }}
+            onMouseLeave={() => {
+              setMousePosition(null);
+              setTracksCursorPosition(null);
+            }}
             data-testid="canvas-timeline-ruler"
             title="Click to seek to position"
           />
@@ -509,14 +509,17 @@ export function Timeline({
             currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
           }`}
           onMouseMove={(e) => {
-            handleTimelineMouseMove(e);
-            // Also track cursor position for tracks area
+            // Calculate mouse position once and use for both systems
             const rect = e.currentTarget.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
+            const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
+            
+            // Update both cursor systems with synchronized values
+            setMousePosition(timeAtCursor);
             setTracksCursorPosition(mouseX);
           }}
           onMouseLeave={() => {
-            handleTimelineMouseLeave();
+            setMousePosition(null);
             setTracksCursorPosition(null);
           }}
           onWheel={handleWheel}
