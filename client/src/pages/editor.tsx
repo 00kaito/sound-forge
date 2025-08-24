@@ -289,6 +289,10 @@ export default function AudioEditor() {
     
     // Only add clip after successful audio loading
     console.log('Editor: Adding clip to tracks state');
+    
+    // Save state before adding new clip
+    saveState(tracks, `Add ${clip.name} to track`);
+    
     setTracks(prevTracks => {
       const newTracks = prevTracks.map(track =>
         track.id === trackId
@@ -301,6 +305,12 @@ export default function AudioEditor() {
   };
 
   const updateClip = (clipId: string, updates: Partial<AudioClip>) => {
+    // Save state for significant changes (position, duration, but not fade adjustments)
+    const isSignificantChange = updates.startTime !== undefined || updates.duration !== undefined;
+    if (isSignificantChange) {
+      saveState(tracks, 'Move/resize clip');
+    }
+    
     setTracks(tracks.map(track => ({
       ...track,
       clips: track.clips.map(clip =>
@@ -460,6 +470,10 @@ export default function AudioEditor() {
 
   const deleteClip = (clipId: string) => {
     console.log('Editor: Deleting clip', clipId);
+    
+    // Save state before deleting clip
+    saveState(tracks, 'Delete clip');
+    
     setTracks(prevTracks => {
       const newTracks = prevTracks.map(track => ({
         ...track,

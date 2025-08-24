@@ -36,6 +36,7 @@ export function WaveformCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggedClip, setDraggedClip] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragStarted, setDragStarted] = useState(false);
   const [fadeEditMode, setFadeEditMode] = useState<{ clipId: string, type: 'fadeIn' | 'fadeOut' } | null>(null);
   const [isDraggingFade, setIsDraggingFade] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -108,12 +109,15 @@ export function WaveformCanvas({
       setFadeEditMode({ clipId: clip.id, type: 'fadeOut' });
       setIsDraggingFade(true);
     } else {
-      // Regular clip dragging
+      // Regular clip dragging - save state once at the start of drag
       setDraggedClip(clip.id);
       setDragOffset({
         x: clickX,
         y: e.clientY - rect.top
       });
+      
+      // Set flag to save state on first move
+      setDragStarted(false);
     }
   };
 
