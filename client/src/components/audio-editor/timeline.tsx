@@ -454,6 +454,8 @@ export function Timeline({
             width={800}
             height={48}
             onClick={handleTimelineClick}
+            onMouseMove={handleTimelineMouseMove}
+            onMouseLeave={handleTimelineMouseLeave}
             data-testid="canvas-timeline-ruler"
             title="Click to seek to position"
           />
