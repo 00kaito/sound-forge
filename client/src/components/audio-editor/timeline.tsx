@@ -474,17 +474,6 @@ export function Timeline({
             </div>
           )}
           
-          {/* Playhead */}
-          <div
-            className="absolute top-0 w-0.5 bg-blue-500 z-50 pointer-events-none"
-            style={{ 
-              left: `${playheadPosition}px`,
-              height: '100vh' // Full viewport height to go through all tracks
-            }}
-            data-testid="playhead"
-          >
-            <div className="w-3 h-3 bg-blue-500 transform -translate-x-1/2 -translate-y-1/2 absolute top-1/2"></div>
-          </div>
         </div>
         
       </div>
@@ -563,6 +552,18 @@ export function Timeline({
             />
           </div>
           
+          {/* Playhead - shows current playback position */}
+          <div
+            className="absolute top-0 w-0.5 bg-blue-500 z-50 pointer-events-none"
+            style={{ 
+              left: `${playheadPosition}px`,
+              height: '100%'
+            }}
+            data-testid="playhead"
+          >
+            <div className="w-3 h-3 bg-blue-500 rounded-full transform -translate-x-1/2 absolute top-2"></div>
+          </div>
+
           {/* Cursor Line - follows mouse across all tracks */}
           {tracksCursorPosition !== null && (
             <div
