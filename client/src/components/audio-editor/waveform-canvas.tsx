@@ -9,6 +9,13 @@ interface WaveformCanvasProps {
   onTrackDrop: (e: React.DragEvent, trackId: string) => void;
   onUpdateClip: (clipId: string, updates: Partial<AudioClip>) => void;
   onDeleteClip: (clipId: string) => void;
+  currentTool?: string;
+  onSplitClip?: (clipId: string, splitTime: number) => void;
+  onCutRegion?: (trackId: string, startTime: number, endTime: number) => void;
+  selectionStart?: number | null;
+  selectionEnd?: number | null;
+  selectedTrackId?: string | null;
+  onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
 }
 
 export function WaveformCanvas({
@@ -17,13 +24,23 @@ export function WaveformCanvas({
   playheadPosition,
   onTrackDrop,
   onUpdateClip,
-  onDeleteClip
+  onDeleteClip,
+  currentTool,
+  onSplitClip,
+  onCutRegion,
+  selectionStart,
+  selectionEnd,
+  selectedTrackId,
+  onSelectionChange
 }: WaveformCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggedClip, setDraggedClip] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [fadeEditMode, setFadeEditMode] = useState<{ clipId: string, type: 'fadeIn' | 'fadeOut' } | null>(null);
   const [isDraggingFade, setIsDraggingFade] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStartX, setSelectionStartX] = useState(0);
+  const [selectionTrackId, setSelectionTrackId] = useState<string | null>(null);
 
   const TRACK_HEIGHT = 96; // 24 * 4 for h-24 equivalent
 
@@ -65,6 +82,18 @@ export function WaveformCanvas({
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clipWidth = clip.duration * pixelsPerSecond;
+    
+    // Check if cut tool is active
+    if (currentTool === 'cut') {
+      // Calculate the split time based on click position
+      const relativeTime = clickX / pixelsPerSecond;
+      const splitTime = clip.startTime + relativeTime;
+      
+      if (onSplitClip) {
+        onSplitClip(clip.id, splitTime);
+      }
+      return;
+    }
     
     // Check if clicking on fade handles
     const fadeInWidth = (clip.fadeIn || 0) * pixelsPerSecond;
@@ -121,6 +150,69 @@ export function WaveformCanvas({
     setDragOffset({ x: 0, y: 0 });
     setFadeEditMode(null);
     setIsDraggingFade(false);
+    
+    // End region selection
+    if (isSelecting && currentTool === 'cut') {
+      setIsSelecting(false);
+      setSelectionTrackId(null);
+    }
+  };
+
+  const handleTrackMouseDown = (e: React.MouseEvent, trackId: string) => {
+    if (currentTool !== 'cut') return;
+    
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickTime = clickX / pixelsPerSecond;
+    
+    setIsSelecting(true);
+    setSelectionStartX(clickX);
+    setSelectionTrackId(trackId);
+    
+    if (onSelectionChange) {
+      onSelectionChange(clickTime, null, trackId);
+    }
+  };
+
+  const handleTrackMouseMove = (e: React.MouseEvent) => {
+    if (isSelecting && currentTool === 'cut' && selectionTrackId) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const currentTime = currentX / pixelsPerSecond;
+      const startTime = selectionStartX / pixelsPerSecond;
+      
+      const start = Math.min(startTime, currentTime);
+      const end = Math.max(startTime, currentTime);
+      
+      if (onSelectionChange) {
+        onSelectionChange(start, end, selectionTrackId);
+      }
+    }
+  };
+
+  const handleTrackMouseUp = (e: React.MouseEvent) => {
+    if (isSelecting && currentTool === 'cut' && selectionTrackId) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const endX = e.clientX - rect.left;
+      const endTime = endX / pixelsPerSecond;
+      const startTime = selectionStartX / pixelsPerSecond;
+      
+      const start = Math.min(startTime, endTime);
+      const end = Math.max(startTime, endTime);
+      
+      // Only cut if there's a meaningful selection (at least 0.1 seconds)
+      if (Math.abs(end - start) > 0.1 && onCutRegion) {
+        onCutRegion(selectionTrackId, start, end);
+      }
+      
+      setIsSelecting(false);
+      setSelectionTrackId(null);
+      
+      if (onSelectionChange) {
+        onSelectionChange(null, null, null);
+      }
+    }
   };
 
   const handleTrackDragOver = (e: React.DragEvent) => {
@@ -159,10 +251,31 @@ export function WaveformCanvas({
               console.log('WaveformCanvas: Drop event on track', track.id);
               onTrackDrop(e, track.id);
             }}
-            onMouseMove={handleClipMouseMove}
-            onMouseUp={handleClipMouseUp}
+            onMouseDown={(e) => handleTrackMouseDown(e, track.id)}
+            onMouseMove={(e) => {
+              handleClipMouseMove(e);
+              handleTrackMouseMove(e);
+            }}
+            onMouseUp={(e) => {
+              handleClipMouseUp();
+              handleTrackMouseUp(e);
+            }}
             data-testid={`track-lane-${track.id}`}
           >
+            {/* Selection overlay */}
+            {currentTool === 'cut' && 
+             selectedTrackId === track.id && 
+             selectionStart !== null && 
+             selectionEnd !== null && (
+              <div
+                className="absolute top-0 bottom-0 bg-red-500 bg-opacity-30 border border-red-500 pointer-events-none z-10"
+                style={{
+                  left: `${selectionStart * pixelsPerSecond}px`,
+                  width: `${(selectionEnd - selectionStart) * pixelsPerSecond}px`,
+                }}
+              />
+            )}
+            
             {track.clips.length === 0 ? (
               <span className="text-gray-500 text-sm pointer-events-none">
                 Drop audio files here

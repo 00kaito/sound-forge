@@ -71,6 +71,10 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
       });
     } finally {
       setIsProcessing(false);
+      // Reset file input so same file can be re-uploaded
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
