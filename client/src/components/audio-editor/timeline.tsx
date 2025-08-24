@@ -124,8 +124,13 @@ export function Timeline({
     const targetPixelsPerSecond = paddedWidth / maxEndTime;
     
     // Convert to zoom percentage (100 pixels per second = 100% zoom)
-    // For very long audio, allow zoom as low as 1% to fit everything
-    const minZoom = maxEndTime > 1800 ? 1 : 10; // If longer than 30 minutes, allow very low zoom
+    // For very long audio, allow extremely low zoom to fit everything
+    let minZoom = 10; // Default minimum
+    if (maxEndTime > 1800) minZoom = 0.5; // 30+ min: 0.5%
+    if (maxEndTime > 3600) minZoom = 0.2; // 1+ hour: 0.2%  
+    if (maxEndTime > 7200) minZoom = 0.1; // 2+ hours: 0.1%
+    if (maxEndTime > 10800) minZoom = 0.05; // 3+ hours: 0.05%
+    
     const newZoom = Math.max(minZoom, Math.min(800, targetPixelsPerSecond));
     updateZoom(newZoom);
   };
@@ -175,8 +180,8 @@ export function Timeline({
         ? zoomLevel * zoomFactor 
         : zoomLevel / zoomFactor;
       
-      // Clamp zoom between 1% and 800%
-      const clampedZoom = Math.max(1, Math.min(800, newZoom));
+      // Clamp zoom between 0.01% and 800% for very long audio support
+      const clampedZoom = Math.max(0.01, Math.min(800, newZoom));
       updateZoom(clampedZoom);
     }
   };
@@ -281,10 +286,22 @@ export function Timeline({
       timeInterval = 5; // Every 5s when very zoomed out
       fontSize = 10;
       minSpacing = 100;
-    } else {
+    } else if (pixelsPerSecond > 10) {
       timeInterval = 10; // Every 10s when extremely zoomed out
       fontSize = 10;
       minSpacing = 120;
+    } else if (pixelsPerSecond > 1) {
+      timeInterval = 60; // Every 1min when ultra zoomed out
+      fontSize = 9;
+      minSpacing = 150;
+    } else if (pixelsPerSecond > 0.5) {
+      timeInterval = 300; // Every 5min for very long audio
+      fontSize = 9;
+      minSpacing = 180;
+    } else {
+      timeInterval = 600; // Every 10min for 3+ hour audio
+      fontSize = 9;
+      minSpacing = 200;
     }
     
     ctx.font = `${fontSize}px Inter`;
@@ -341,7 +358,7 @@ export function Timeline({
               <Minus className="w-4 h-4" />
             </Button>
             <span className="text-sm text-gray-300 min-w-[60px] text-center">
-              {Math.round(zoomLevel)}%
+              {zoomLevel < 1 ? zoomLevel.toFixed(2) : Math.round(zoomLevel)}%
             </span>
             <Button
               onClick={handleZoomIn}
