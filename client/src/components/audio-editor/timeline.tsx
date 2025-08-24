@@ -124,13 +124,36 @@ export function Timeline({
     const timelineArea = timelineContainerRef.current?.querySelector('.flex-1.overflow-x-auto') as HTMLElement;
     const availableWidth = timelineArea?.clientWidth || 800;
     
-    // Add some padding so content isn't cramped against edges
-    const paddedWidth = availableWidth - 100; // 100px padding
+    // Check if content already fits at current zoom level
+    const currentContentWidth = maxEndTime * pixelsPerSecond;
+    const contentFitsOnScreen = currentContentWidth <= availableWidth;
     
-    // Calculate target pixels per second to fit all content
+    if (contentFitsOnScreen) {
+      // Content already fits, don't zoom out - try to zoom in instead
+      console.log('Auto-fit: Content already fits, attempting to zoom in');
+      
+      // Calculate maximum zoom where content still fits
+      const maxPixelsPerSecond = availableWidth / maxEndTime;
+      const maxZoomForFit = (maxPixelsPerSecond / basePixelsPerSecond) * 100;
+      const targetZoom = Math.min(800, maxZoomForFit * 0.9); // 90% of max to leave some padding
+      
+      // Only zoom in if it would be significantly higher than current
+      if (targetZoom > zoomLevel * 1.2) {
+        updateZoom(targetZoom);
+        console.log('Auto-fit: Zoomed in to', targetZoom);
+      } else {
+        console.log('Auto-fit: Current zoom is already optimal');
+      }
+      return;
+    }
+    
+    // Content doesn't fit, calculate optimal zoom to fit
+    const paddedWidth = availableWidth - 100; // 100px padding
     const targetPixelsPerSecond = paddedWidth / maxEndTime;
     
-    // Convert to zoom percentage (100 pixels per second = 100% zoom)
+    // Convert to zoom percentage using new base scale
+    const calculatedZoom = (targetPixelsPerSecond / basePixelsPerSecond) * 100;
+    
     // For very long audio, allow extremely low zoom to fit everything
     let minZoom = 10; // Default minimum
     if (maxEndTime > 1800) minZoom = 0.5; // 30+ min: 0.5%
@@ -138,8 +161,9 @@ export function Timeline({
     if (maxEndTime > 7200) minZoom = 0.1; // 2+ hours: 0.1%
     if (maxEndTime > 10800) minZoom = 0.05; // 3+ hours: 0.05%
     
-    const newZoom = Math.max(minZoom, Math.min(800, targetPixelsPerSecond));
+    const newZoom = Math.max(minZoom, Math.min(800, calculatedZoom));
     updateZoom(newZoom);
+    console.log('Auto-fit: Content too wide, zoomed out to', newZoom);
   };
   
   // Mouse drag zoom handlers
