@@ -174,16 +174,34 @@ export class AudioConcatenator {
     totalDuration: number,
     onProgress?: (progress: number) => void
   ): Promise<AudioBuffer> {
+    console.log('Timeline Render: Starting render', {
+      tracksCount: tracks.length,
+      clipsCount: clips.length,
+      totalDuration,
+      sampleRate: audioContext.sampleRate
+    });
+    
     const sampleRate = audioContext.sampleRate;
     const numberOfChannels = 2; // Stereo
     const length = Math.ceil(totalDuration * sampleRate);
     
+    console.log('Timeline Render: Buffer specs', {
+      length,
+      lengthSeconds: length / sampleRate,
+      numberOfChannels
+    });
+    
     if (length === 0) {
-      // Return empty buffer if no content
+      console.warn('Timeline Render: No content, returning empty buffer');
       return audioContext.createBuffer(numberOfChannels, 1, sampleRate);
     }
 
     const outputBuffer = audioContext.createBuffer(numberOfChannels, length, sampleRate);
+    console.log('Timeline Render: Created output buffer', {
+      duration: outputBuffer.duration,
+      length: outputBuffer.length,
+      channels: outputBuffer.numberOfChannels
+    });
     
     // Clear output buffer
     for (let channel = 0; channel < numberOfChannels; channel++) {
@@ -195,12 +213,28 @@ export class AudioConcatenator {
     const totalClips = clips.length;
     let processedClips = 0;
     
+    console.log('Timeline Render: Processing clips', { totalClips });
+    
     for (const clip of clips) {
+      console.log('Timeline Render: Processing clip', {
+        clipId: clip.id,
+        audioFileId: clip.audioFileId,
+        startTime: clip.startTime,
+        duration: clip.duration
+      });
+      
       const sourceBuffer = getAudioBuffer(clip.audioFileId);
       if (!sourceBuffer) {
+        console.warn('Timeline Render: No source buffer for clip', clip.audioFileId);
         processedClips++;
         continue;
       }
+      
+      console.log('Timeline Render: Found source buffer', {
+        sourceDuration: sourceBuffer.duration,
+        sourceLength: sourceBuffer.length,
+        sourceChannels: sourceBuffer.numberOfChannels
+      });
 
       const track = tracks.find(t => t.id === clip.trackId);
       if (!track) {
@@ -228,11 +262,14 @@ export class AudioConcatenator {
       
       processedClips++;
       const progress = Math.floor((processedClips / totalClips) * 80); // Reserve 20% for normalization
+      console.log('Timeline Render: Clip processed', { processedClips, totalClips, progress });
       onProgress?.(progress);
       
       // Yield control to prevent freezing
       await this.yield();
     }
+    
+    console.log('Timeline Render: All clips processed');
 
     // Apply simple normalization to prevent clipping
     console.log('Timeline Render: Starting normalization at 85%');
