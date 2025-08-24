@@ -6,9 +6,10 @@ import { Track } from '@/types/audio';
 interface TrackHeaderProps {
   track: Track;
   onUpdate: (updates: Partial<Track>) => void;
+  isLoading?: boolean;
 }
 
-export function TrackHeader({ track, onUpdate }: TrackHeaderProps) {
+export function TrackHeader({ track, onUpdate, isLoading = false }: TrackHeaderProps) {
   const handleVolumeChange = (value: number[]) => {
     onUpdate({ volume: value[0] / 100 });
   };
@@ -38,6 +39,9 @@ export function TrackHeader({ track, onUpdate }: TrackHeaderProps) {
           {track.name}
         </span>
         <div className="flex space-x-1">
+          {isLoading && (
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-2" />
+          )}
           <Button
             variant="secondary"
             size="sm"

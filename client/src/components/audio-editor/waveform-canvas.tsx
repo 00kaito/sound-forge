@@ -290,10 +290,7 @@ export function WaveformCanvas({
               draggedOverTrackId === track.id && draggedClip ? 'bg-blue-500 bg-opacity-20 border-blue-400' : ''
             }`}
             onDragOver={handleTrackDragOver}
-            onDrop={(e) => {
-              console.log('WaveformCanvas: Drop event on track', track.id);
-              onTrackDrop(e, track.id);
-            }}
+            onDrop={(e) => onTrackDrop(e, track.id)}
             onMouseDown={(e) => handleTrackMouseDown(e, track.id)}
             onMouseMove={(e) => {
               handleClipMouseMove(e);

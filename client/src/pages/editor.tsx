@@ -76,6 +76,7 @@ export default function AudioEditor() {
   const [selectionStart, setSelectionStart] = useState<number | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [loadingTracks, setLoadingTracks] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     initialize();
@@ -239,6 +240,9 @@ export default function AudioEditor() {
   const addClipToTrack = async (trackId: string, clip: AudioClip) => {
     console.log('Editor: addClipToTrack called', { trackId, clipId: clip.id, clipName: clip.name });
     
+    // Add track to loading state
+    setLoadingTracks(prev => new Set(prev).add(trackId));
+    
     // Check if this will be the first clip in the entire project
     const totalClips = tracks.flatMap(track => track.clips).length;
     const isFirstClip = totalClips === 0;
@@ -252,6 +256,11 @@ export default function AudioEditor() {
     if (!audioFile) {
       console.error('Editor: Audio file not found for clip', clip.audioFileId);
       console.error('Editor: Available audio file IDs:', audioFiles.map(f => f.id));
+      setLoadingTracks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(trackId);
+        return newSet;
+      });
       toast({
         title: "Audio File Error",
         description: `Audio file not found: ${clip.name}`,
@@ -284,6 +293,11 @@ export default function AudioEditor() {
       }
     } catch (error) {
       console.error('Editor: Failed to load audio:', error);
+      setLoadingTracks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(trackId);
+        return newSet;
+      });
       toast({
         title: "Audio Loading Error",
         description: `Failed to load ${clip.name} for playback`,
@@ -324,6 +338,13 @@ export default function AudioEditor() {
         console.log('Editor: Auto-fit zoom applied:', newZoom);
       }, 100);
     }
+    
+    // Remove track from loading state
+    setLoadingTracks(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(trackId);
+      return newSet;
+    });
   };
 
   const updateClip = (clipId: string, updates: Partial<AudioClip>) => {
@@ -862,6 +883,7 @@ export default function AudioEditor() {
           onAddTrack={addTrack}
           onMoveClipBetweenTracks={moveClipBetweenTracks}
           onSaveState={saveState}
+          loadingTracks={loadingTracks}
           data-testid="timeline"
         />
       </div>

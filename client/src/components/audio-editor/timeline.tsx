@@ -27,6 +27,7 @@ interface TimelineProps {
   onAddTrack?: () => void;
   onMoveClipBetweenTracks?: (clipId: string, targetTrackId: string) => void;
   onSaveState?: (tracks: any[], action: string) => void;
+  loadingTracks?: Set<string>;
 }
 
 export function Timeline({
@@ -50,13 +51,15 @@ export function Timeline({
   onToolChange,
   onAddTrack,
   onMoveClipBetweenTracks,
-  onSaveState
+  onSaveState,
+  loadingTracks
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   
   // Mouse cursor position tracking
   const [mousePosition, setMousePosition] = useState<number | null>(null);
+  const [tracksCursorPosition, setTracksCursorPosition] = useState<number | null>(null);
   
   // Use zoomLevel from projectData or default to 25%
   const zoomLevel = projectData.zoomLevel || 25;
@@ -130,7 +133,6 @@ export function Timeline({
     
     if (contentFitsOnScreen) {
       // Content already fits, don't zoom out - try to zoom in instead
-      console.log('Auto-fit: Content already fits, attempting to zoom in');
       
       // Calculate maximum zoom where content still fits
       const maxPixelsPerSecond = availableWidth / maxEndTime;
@@ -140,9 +142,6 @@ export function Timeline({
       // Only zoom in if it would be significantly higher than current
       if (targetZoom > zoomLevel * 1.2) {
         updateZoom(targetZoom);
-        console.log('Auto-fit: Zoomed in to', targetZoom);
-      } else {
-        console.log('Auto-fit: Current zoom is already optimal');
       }
       return;
     }
@@ -163,7 +162,6 @@ export function Timeline({
     
     const newZoom = Math.max(minZoom, Math.min(800, calculatedZoom));
     updateZoom(newZoom);
-    console.log('Auto-fit: Content too wide, zoomed out to', newZoom);
   };
   
   // Mouse drag zoom handlers
@@ -192,11 +190,11 @@ export function Timeline({
     const mouseX = e.clientX - rect.left;
     const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
     setMousePosition(timeAtCursor);
-    console.log('Cursor debug:', { mouseX, pixelsPerSecond, timeAtCursor, zoomLevel });
   };
 
   const handleTimelineMouseLeave = () => {
     setMousePosition(null);
+    setTracksCursorPosition(null);
   };
 
   // Scroll wheel zoom handler
@@ -237,12 +235,10 @@ export function Timeline({
     try {
       const audioFileData = e.dataTransfer.getData('audio-file');
       if (!audioFileData) {
-        console.log('Timeline: No audio-file data in drop');
         return;
       }
       
       const audioFile = JSON.parse(audioFileData);
-      console.log('Timeline: Parsed audio file data', audioFile);
       
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -261,13 +257,6 @@ export function Timeline({
         name: audioFile.name
       };
       
-      console.log('Timeline: Adding clip to track', { 
-        trackId, 
-        clipName: newClip.name, 
-        startTime, 
-        audioFileId: audioFile.id,
-        clipId: newClip.id
-      });
       
       // Add clip to track via dedicated callback
       onAddClipToTrack(trackId, newClip);
@@ -352,10 +341,6 @@ export function Timeline({
         if (x + textWidth + 4 < width) {
           ctx.fillText(timeText, x + 2, height - 15);
           lastLabelX = x;
-          // Debug first few labels
-          if (time <= timeInterval * 3) {
-            console.log('Ruler debug:', { time, x, pixelsPerSecond, zoomLevel, timeText });
-          }
         }
       }
     }
@@ -496,6 +481,7 @@ export function Timeline({
               key={track.id}
               track={track}
               onUpdate={(updates: Partial<Track>) => onUpdateTrack(track.id, updates)}
+              isLoading={loadingTracks?.has(track.id) || false}
               data-testid={`track-header-${track.id}`}
             />
           ))}
@@ -522,8 +508,17 @@ export function Timeline({
           className={`flex-1 overflow-x-auto overflow-y-auto relative bg-editor-bg ${
             currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
           }`}
-          onMouseMove={handleTimelineMouseMove}
-          onMouseLeave={handleTimelineMouseLeave}
+          onMouseMove={(e) => {
+            handleTimelineMouseMove(e);
+            // Also track cursor position for tracks area
+            const rect = e.currentTarget.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            setTracksCursorPosition(mouseX);
+          }}
+          onMouseLeave={() => {
+            handleTimelineMouseLeave();
+            setTracksCursorPosition(null);
+          }}
           onWheel={handleWheel}
         >
           <div className="min-w-max" style={{ width: Math.max(1200, (playbackState.totalDuration || 60) * pixelsPerSecond + 200) }}>
@@ -546,6 +541,18 @@ export function Timeline({
               data-testid="waveform-canvas"
             />
           </div>
+          
+          {/* Cursor Line - follows mouse across all tracks */}
+          {tracksCursorPosition !== null && (
+            <div
+              className="absolute top-0 w-0.5 bg-yellow-300 opacity-60 pointer-events-none z-30"
+              style={{ 
+                left: `${tracksCursorPosition}px`,
+                height: '100%'
+              }}
+              data-testid="cursor-line"
+            />
+          )}
           
           
           {/* Zoom Hint */}
