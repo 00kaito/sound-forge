@@ -9,6 +9,7 @@ interface WaveformCanvasProps {
   onTrackDrop: (e: React.DragEvent, trackId: string) => void;
   onUpdateClip: (clipId: string, updates: Partial<AudioClip>) => void;
   onDeleteClip: (clipId: string) => void;
+  onMoveClipBetweenTracks?: (clipId: string, targetTrackId: string) => void;
   onSaveState?: (tracks: any[], action: string) => void;
   currentTool?: string;
   onSplitClip?: (clipId: string, splitTime: number) => void;
@@ -33,13 +34,15 @@ export function WaveformCanvas({
   selectionEnd,
   selectedTrackId,
   onSelectionChange,
+  onMoveClipBetweenTracks,
   onSaveState
 }: WaveformCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggedClip, setDraggedClip] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStarted, setDragStarted] = useState(false);
-  const [initialClipPosition, setInitialClipPosition] = useState<{ clipId: string, startTime: number } | null>(null);
+  const [initialClipPosition, setInitialClipPosition] = useState<{ clipId: string, startTime: number, trackId: string } | null>(null);
+  const [draggedOverTrackId, setDraggedOverTrackId] = useState<string | null>(null);
   const [fadeEditMode, setFadeEditMode] = useState<{ clipId: string, type: 'fadeIn' | 'fadeOut' } | null>(null);
   const [isDraggingFade, setIsDraggingFade] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -120,7 +123,10 @@ export function WaveformCanvas({
       });
       
       // Save initial clip position for potential undo
-      setInitialClipPosition({ clipId: clip.id, startTime: clip.startTime });
+      const currentTrack = tracks.find(track => track.clips.some(c => c.id === clip.id));
+      if (currentTrack) {
+        setInitialClipPosition({ clipId: clip.id, startTime: clip.startTime, trackId: currentTrack.id });
+      }
       setDragStarted(false);
     }
   };
@@ -149,14 +155,27 @@ export function WaveformCanvas({
       const newX = e.clientX - rect.left - dragOffset.x;
       const newStartTime = Math.max(0, newX / pixelsPerSecond);
       
+      // Calculate which track the clip is being dragged over
+      const mouseY = e.clientY - rect.top;
+      const trackIndex = Math.floor(mouseY / TRACK_HEIGHT);
+      const targetTrack = tracks[trackIndex];
+      
+      if (targetTrack) {
+        setDraggedOverTrackId(targetTrack.id);
+      }
+      
       onUpdateClip(draggedClip, { startTime: newStartTime });
     }
   };
 
   const handleClipMouseUp = () => {
-    // Save state after clip movement if position changed
-    if (draggedClip && initialClipPosition && onSaveState) {
-      // Find current clip to check if position actually changed
+    // Handle clip movement between tracks
+    if (draggedClip && initialClipPosition && draggedOverTrackId && 
+        draggedOverTrackId !== initialClipPosition.trackId && onMoveClipBetweenTracks) {
+      // Clip was moved to a different track
+      onMoveClipBetweenTracks(draggedClip, draggedOverTrackId);
+    } else if (draggedClip && initialClipPosition && onSaveState) {
+      // Regular position change on same track
       const currentClip = tracks.flatMap(t => t.clips).find(c => c.id === draggedClip);
       if (currentClip && Math.abs(currentClip.startTime - initialClipPosition.startTime) > 0.01) {
         // Position changed significantly, save the previous state for undo
@@ -167,6 +186,7 @@ export function WaveformCanvas({
     setDraggedClip(null);
     setDragOffset({ x: 0, y: 0 });
     setInitialClipPosition(null);
+    setDraggedOverTrackId(null);
     setFadeEditMode(null);
     setIsDraggingFade(false);
     
@@ -266,6 +286,8 @@ export function WaveformCanvas({
             key={track.id}
             className={`h-24 border-b border-gray-700 relative flex items-center justify-center ${
               currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
+            } ${
+              draggedOverTrackId === track.id && draggedClip ? 'bg-blue-500 bg-opacity-20 border-blue-400' : ''
             }`}
             onDragOver={handleTrackDragOver}
             onDrop={(e) => {

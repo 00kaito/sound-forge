@@ -484,6 +484,54 @@ export default function AudioEditor() {
     });
   };
 
+  const moveClipBetweenTracks = (clipId: string, targetTrackId: string) => {
+    console.log('Editor: Moving clip between tracks', { clipId, targetTrackId });
+    
+    // Save state before moving clip
+    saveState(tracks, 'Move clip between tracks');
+    
+    setTracks(prevTracks => {
+      // Find the clip and its current track
+      let clipToMove: AudioClip | null = null;
+      
+      const newTracks = prevTracks.map(track => {
+        const clipIndex = track.clips.findIndex(clip => clip.id === clipId);
+        if (clipIndex !== -1) {
+          // Found the clip, remove it from current track
+          clipToMove = track.clips[clipIndex];
+          return {
+            ...track,
+            clips: track.clips.filter(clip => clip.id !== clipId)
+          };
+        }
+        return track;
+      });
+      
+      // Add the clip to the target track
+      if (clipToMove) {
+        const finalTracks = newTracks.map(track => {
+          if (track.id === targetTrackId) {
+            return {
+              ...track,
+              clips: [...track.clips, clipToMove]
+            };
+          }
+          return track;
+        });
+        
+        console.log('Editor: Clip moved successfully', {
+          clipId,
+          fromTrack: prevTracks.find(t => t.clips.some(c => c.id === clipId))?.id,
+          toTrack: targetTrackId
+        });
+        
+        return finalTracks;
+      }
+      
+      return newTracks;
+    });
+  };
+
   const handleExport = async (settings: ExportSettings) => {
     try {
       toast({
@@ -790,6 +838,7 @@ export default function AudioEditor() {
           }}
           onToolChange={setCurrentTool}
           onAddTrack={addTrack}
+          onMoveClipBetweenTracks={moveClipBetweenTracks}
           onSaveState={saveState}
           data-testid="timeline"
         />

@@ -25,6 +25,7 @@ interface TimelineProps {
   onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
   onToolChange?: (tool: string) => void;
   onAddTrack?: () => void;
+  onMoveClipBetweenTracks?: (clipId: string, targetTrackId: string) => void;
   onSaveState?: (tracks: any[], action: string) => void;
 }
 
@@ -48,6 +49,7 @@ export function Timeline({
   onSelectionChange,
   onToolChange,
   onAddTrack,
+  onMoveClipBetweenTracks,
   onSaveState
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
@@ -406,6 +408,7 @@ export function Timeline({
               selectionEnd={selectionEnd}
               selectedTrackId={selectedTrackId}
               onSelectionChange={onSelectionChange}
+              onMoveClipBetweenTracks={onMoveClipBetweenTracks}
               onSaveState={onSaveState}
               data-testid="waveform-canvas"
             />
