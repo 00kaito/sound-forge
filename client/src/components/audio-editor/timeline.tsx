@@ -64,10 +64,10 @@ export function Timeline({
   // Use zoomLevel from projectData or default to 25%
   const zoomLevel = projectData.zoomLevel || 25;
   
-  // Calculate pixels per second based on new scale: 100% = 30 minutes visible
-  // If screen is ~1600px wide, then 100% should show 1800s (30min)
-  // So base rate = 1600/1800 ≈ 0.89 pixels per second at 100%
-  const basePixelsPerSecond = 0.89; // This makes 100% = ~30min on typical screen
+  // Calculate pixels per second based on new scale: 100% = 5 minutes visible
+  // If screen is ~1600px wide, then 100% should show 300s (5min)
+  // So base rate = 1600/300 ≈ 5.33 pixels per second at 100%
+  const basePixelsPerSecond = 5.33; // This makes 100% = ~5min on typical screen
   const pixelsPerSecond = basePixelsPerSecond * (zoomLevel / 100);
   
   // Mouse drag state for zooming
@@ -275,41 +275,45 @@ export function Timeline({
     ctx.fillStyle = '#ffffff';
     
     // Calculate appropriate time interval and font size based on zoom level
-    // Adjusted for new scale where 100% = 30min visible
+    // Adjusted for new scale where 100% = 5min visible
     let timeInterval = 1;
     let fontSize = 10;
     let minSpacing = 80; // Minimum pixels between labels to avoid overlap
     
-    if (pixelsPerSecond > 4) {
-      timeInterval = 30; // Every 30s when zoomed in (new scale)
+    if (pixelsPerSecond > 20) {
+      timeInterval = 5; // Every 5s when very zoomed in
+      fontSize = 10;
+      minSpacing = 60;
+    } else if (pixelsPerSecond > 10) {
+      timeInterval = 10; // Every 10s when zoomed in
       fontSize = 10;
       minSpacing = 70;
-    } else if (pixelsPerSecond > 2) {
-      timeInterval = 60; // Every 1min at normal zoom
+    } else if (pixelsPerSecond > 5) {
+      timeInterval = 30; // Every 30s at normal zoom
       fontSize = 10;
       minSpacing = 80;
-    } else if (pixelsPerSecond > 1) {
-      timeInterval = 120; // Every 2min when zoomed out
+    } else if (pixelsPerSecond > 2) {
+      timeInterval = 60; // Every 1min when zoomed out
       fontSize = 10;
       minSpacing = 90;
-    } else if (pixelsPerSecond > 0.5) {
-      timeInterval = 300; // Every 5min when very zoomed out
+    } else if (pixelsPerSecond > 1) {
+      timeInterval = 120; // Every 2min when very zoomed out
       fontSize = 10;
       minSpacing = 100;
-    } else if (pixelsPerSecond > 0.2) {
-      timeInterval = 600; // Every 10min when extremely zoomed out
+    } else if (pixelsPerSecond > 0.5) {
+      timeInterval = 300; // Every 5min when extremely zoomed out
       fontSize = 10;
       minSpacing = 120;
-    } else if (pixelsPerSecond > 0.1) {
-      timeInterval = 900; // Every 15min when ultra zoomed out
+    } else if (pixelsPerSecond > 0.2) {
+      timeInterval = 600; // Every 10min when ultra zoomed out
       fontSize = 9;
       minSpacing = 150;
-    } else if (pixelsPerSecond > 0.05) {
-      timeInterval = 1800; // Every 30min for very long audio
+    } else if (pixelsPerSecond > 0.1) {
+      timeInterval = 900; // Every 15min for very long audio
       fontSize = 9;
       minSpacing = 180;
     } else {
-      timeInterval = 3600; // Every 1 hour for 3+ hour audio
+      timeInterval = 1800; // Every 30min for 3+ hour audio
       fontSize = 9;
       minSpacing = 200;
     }
