@@ -375,7 +375,7 @@ export function Timeline({
               onClick={handleZoomOut}
               variant="outline"
               size="sm"
-              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              className="text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400"
               title="Zoom Out"
             >
               <Minus className="w-4 h-4" />
@@ -387,7 +387,7 @@ export function Timeline({
               onClick={handleZoomIn}
               variant="outline"
               size="sm"
-              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              className="text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400"
               title="Zoom In"
             >
               <Plus className="w-4 h-4" />
@@ -396,7 +396,7 @@ export function Timeline({
               onClick={handleAutoFit}
               variant="outline"
               size="sm"
-              className="text-gray-300 border-gray-600 hover:bg-gray-700"
+              className="text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400"
               title="Auto-fit to content"
               onMouseDown={(e) => e.stopPropagation()}
               onMouseUp={(e) => e.stopPropagation()}
@@ -420,8 +420,8 @@ export function Timeline({
               size="sm"
               className={`${
                 currentTool === 'cut' 
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                  : 'text-gray-300 border-gray-600 hover:bg-gray-700'
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white border-2 border-blue-500 hover:border-blue-400' 
+                  : 'text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400'
               }`}
               title="Cut Tool - Click clips to split or drag to select region"
               data-testid="button-tool-cut"
@@ -510,7 +510,7 @@ export function Timeline({
                 onClick={onAddTrack}
                 variant="secondary"
                 size="sm"
-                className="bg-gray-700 hover:bg-gray-600 text-gray-300"
+                className="bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400"
                 data-testid="button-add-track"
               >
                 <Plus className="w-4 h-4 mr-2" />

@@ -53,7 +53,7 @@ export function Toolbar({
             onClick={onOpenProject}
             variant="secondary"
             size="sm"
-            className="bg-gray-700 hover:bg-gray-600"
+            className="bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400"
             data-testid="button-open-project"
           >
             <FolderOpen className="w-4 h-4 mr-1" />
@@ -63,7 +63,7 @@ export function Toolbar({
             onClick={onSaveProject}
             variant="secondary"
             size="sm"
-            className="bg-gray-700 hover:bg-gray-600"
+            className="bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400"
             data-testid="button-save-project"
           >
             <Save className="w-4 h-4 mr-1" />
@@ -76,7 +76,7 @@ export function Toolbar({
       <div className="flex items-center space-x-2">
         <Button
           onClick={handlePlay}
-          className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-full p-0"
+          className="w-10 h-10 bg-blue-600 hover:bg-blue-500 text-white border-2 border-blue-500 hover:border-blue-400 rounded-full p-0 shadow-lg"
           data-testid="button-play-pause"
         >
           {playbackState.isPlaying ? (
@@ -89,7 +89,7 @@ export function Toolbar({
           onClick={handleStop}
           variant="secondary"
           size="sm"
-          className="w-8 h-8 bg-gray-700 hover:bg-gray-600 p-0"
+          className="w-8 h-8 bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400 p-0"
           data-testid="button-stop"
         >
           <Square className="w-3 h-3" />
@@ -98,7 +98,7 @@ export function Toolbar({
           onClick={handleGoToStart}
           variant="secondary"
           size="sm"
-          className="w-8 h-8 bg-gray-700 hover:bg-gray-600 p-0"
+          className="w-8 h-8 bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400 p-0"
           data-testid="button-go-to-start"
         >
           <SkipBack className="w-3 h-3" />
@@ -125,7 +125,7 @@ export function Toolbar({
         <Button
           variant="secondary"
           size="sm"
-          className="w-8 h-8 bg-gray-700 hover:bg-gray-600 p-0"
+          className="w-8 h-8 bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400 p-0"
           data-testid="button-settings"
         >
           <Settings className="w-4 h-4" />

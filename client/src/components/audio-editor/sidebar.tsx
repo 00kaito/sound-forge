@@ -152,7 +152,7 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 hover:border-blue-400"
                   data-testid="button-merge-files"
                 >
                   <Link2 className="w-4 h-4 mr-2" />
@@ -297,7 +297,7 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-6 h-6 p-0 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300"
+                  className="w-6 h-6 p-0 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-200 hover:bg-red-900/20"
                   onClick={(e) => {
                     e.stopPropagation();
                     removeAudioFile(file.id);
