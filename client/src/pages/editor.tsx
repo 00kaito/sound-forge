@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
+import { useHistory } from '@/hooks/use-history';
 import { AudioConcatenator } from '@/lib/audio-concatenator';
 import { Toolbar } from '@/components/audio-editor/toolbar';
 import { Sidebar } from '@/components/audio-editor/sidebar';
@@ -59,6 +60,9 @@ export default function AudioEditor() {
     }
   ]);
 
+  // History management for undo/redo
+  const { saveState, undo, redo, canUndo, canRedo, getPreviousAction, getNextAction } = useHistory(tracks);
+
   const [projectData, setProjectData] = useState<ProjectData>({
     tracks,
     tempo: 120,
@@ -77,9 +81,42 @@ export default function AudioEditor() {
     initialize();
   }, [initialize]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts including undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Undo/Redo shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          const restoredTracks = undo();
+          if (restoredTracks) {
+            setTracks(restoredTracks);
+            const action = getPreviousAction();
+            toast({
+              title: "Undo",
+              description: `Undone: ${action}`
+            });
+          }
+        }
+        return;
+      }
+      
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        if (canRedo) {
+          const restoredTracks = redo();
+          if (restoredTracks) {
+            setTracks(restoredTracks);
+            const action = getNextAction();
+            toast({
+              title: "Redo",
+              description: `Redone: ${action}`
+            });
+          }
+        }
+        return;
+      }
+      
       if (e.key === 'Delete' || e.key === 'Backspace') {
         // For now, we'd need to track selected clips
         // This is a placeholder for future selection functionality
@@ -97,7 +134,7 @@ export default function AudioEditor() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [playbackState.isPlaying, play, pause]);
+  }, [playbackState.isPlaying, play, pause, canUndo, canRedo, undo, redo, getPreviousAction, getNextAction, toast]);
 
   useEffect(() => {
     if (audioError) {
@@ -274,6 +311,9 @@ export default function AudioEditor() {
 
   // Split clip at a specific time (for cut tool)
   const splitClip = (clipId: string, splitTime: number) => {
+    // Save state before splitting for undo
+    saveState(tracks, 'Split clip');
+    
     setTracks(tracks.map(track => ({
       ...track,
       clips: track.clips.flatMap(clip => {
@@ -313,6 +353,9 @@ export default function AudioEditor() {
   // Cut out selected region (for cut tool)
   const cutRegion = (trackId: string, startTime: number, endTime: number) => {
     if (startTime >= endTime) return;
+    
+    // Save state before cutting for undo
+    saveState(tracks, `Cut region ${startTime.toFixed(2)}s-${endTime.toFixed(2)}s`);
     
     setTracks(tracks.map(track => {
       if (track.id !== trackId) return track;
