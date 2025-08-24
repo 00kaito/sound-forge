@@ -5,6 +5,7 @@ export class AudioEngine {
   private masterGain: GainNode | null = null;
   private tracks: Map<string, AudioBuffer> = new Map();
   private trackGains: Map<string, GainNode> = new Map();
+  private trackPans: Map<string, StereoPannerNode> = new Map();
   private isInitialized = false;
   private playbackState: PlaybackState = {
     isPlaying: false,
@@ -71,9 +72,24 @@ export class AudioEngine {
       throw new Error('Audio context not initialized');
     }
 
+    // Check if already exists
+    if (this.trackGains.has(trackId)) {
+      return this.trackGains.get(trackId)!;
+    }
+
+    // Create gain and pan nodes
     const gainNode = this.audioContext.createGain();
-    gainNode.connect(this.masterGain);
+    const panNode = this.audioContext.createStereoPanner();
+    
+    // Connect: gain -> pan -> master
+    gainNode.connect(panNode);
+    panNode.connect(this.masterGain);
+    
+    // Store both nodes
     this.trackGains.set(trackId, gainNode);
+    this.trackPans.set(trackId, panNode);
+    
+    console.log('Audio Engine: Created track gain and pan nodes', trackId);
     return gainNode;
   }
 
@@ -81,20 +97,19 @@ export class AudioEngine {
     const gainNode = this.trackGains.get(trackId);
     if (gainNode) {
       gainNode.gain.value = volume;
+      console.log('Audio Engine: Track volume updated', { trackId, volume });
+    } else {
+      console.warn('Audio Engine: No gain node found for track', trackId);
     }
   }
 
   setTrackPan(trackId: string, pan: number): void {
-    if (!this.audioContext) return;
-
-    const gainNode = this.trackGains.get(trackId);
-    if (gainNode) {
-      // Disconnect and reconnect with stereo panner
-      gainNode.disconnect();
-      const panNode = this.audioContext.createStereoPanner();
+    const panNode = this.trackPans.get(trackId);
+    if (panNode) {
       panNode.pan.value = pan;
-      gainNode.connect(panNode);
-      panNode.connect(this.masterGain!);
+      console.log('Audio Engine: Track pan updated', { trackId, pan });
+    } else {
+      console.warn('Audio Engine: No pan node found for track', trackId);
     }
   }
 
@@ -239,23 +254,21 @@ export class AudioEngine {
       const track = this.currentTracks.find(t => t.id === clip.trackId);
       if (!track || track.muted) continue;
       
-      // Create audio source
+      // Create audio source and clip gain (for clip-level volume/fade only)
       const source = this.audioContext.createBufferSource();
-      const gainNode = this.audioContext.createGain();
-      const panNode = this.audioContext.createStereoPanner();
+      const clipGainNode = this.audioContext.createGain();
       
       source.buffer = audioBuffer;
-      source.connect(gainNode);
-      gainNode.connect(panNode);
+      source.connect(clipGainNode);
       
-      // Connect to track gain node for real-time volume/pan control
+      // Connect to track gain node for real-time track-level volume/pan control
       const trackGain = this.trackGains.get(clip.trackId);
       if (trackGain) {
-        panNode.connect(trackGain);
+        clipGainNode.connect(trackGain);
         console.log('Audio Engine: Connected clip to track gain', { clipId: clip.id, trackId: clip.trackId });
       } else {
         // Fallback to master gain if track gain doesn't exist
-        panNode.connect(this.masterGain);
+        clipGainNode.connect(this.masterGain);
         console.warn('Audio Engine: No track gain found, connecting to master', clip.trackId);
       }
       
@@ -274,18 +287,15 @@ export class AudioEngine {
         sourceStartTime += (clipStartTime - currentTime);
       }
       
-      // Apply base volume and pan
-      const baseVolume = clip.volume * track.volume;
-      panNode.pan.value = track.pan;
+      // Apply only clip volume (track volume/pan handled by track nodes)
+      const clipVolume = clip.volume;
       
       // Apply fade in/out with proper scheduling
-      let initialVolume = baseVolume;
-      
       // Handle fade in
       if (clip.fadeIn && clip.fadeIn > 0 && currentTime <= clipStartTime + clip.fadeIn) {
         const fadeInEnd = sourceStartTime + clip.fadeIn;
-        gainNode.gain.setValueAtTime(0, sourceStartTime);
-        gainNode.gain.linearRampToValueAtTime(baseVolume, fadeInEnd);
+        clipGainNode.gain.setValueAtTime(0, sourceStartTime);
+        clipGainNode.gain.linearRampToValueAtTime(clipVolume, fadeInEnd);
         console.log('Audio Engine: Applied fade in', {
           clipName: clip.name,
           fadeInDuration: clip.fadeIn,
@@ -293,7 +303,7 @@ export class AudioEngine {
           endTime: fadeInEnd
         });
       } else {
-        gainNode.gain.setValueAtTime(baseVolume, sourceStartTime);
+        clipGainNode.gain.setValueAtTime(clipVolume, sourceStartTime);
       }
       
       // Handle fade out
@@ -302,8 +312,10 @@ export class AudioEngine {
         const fadeOutStart = sourceEndTime - clip.fadeOut;
         
         // Always apply fade out if it's defined
-        gainNode.gain.setValueAtTime(baseVolume, fadeOutStart);
-        gainNode.gain.linearRampToValueAtTime(0, sourceEndTime);
+        if (fadeOutStart < sourceEndTime) {
+          clipGainNode.gain.setValueAtTime(clipVolume, fadeOutStart);
+          clipGainNode.gain.linearRampToValueAtTime(0, sourceEndTime);
+        }
         
         console.log('Audio Engine: Applied fade out', {
           clipName: clip.name,
@@ -321,7 +333,7 @@ export class AudioEngine {
           startTime: sourceStartTime,
           offset: sourceOffset,
           duration: sourceDuration,
-          volume: gainNode.gain.value
+          volume: clipGainNode.gain.value
         });
         source.start(sourceStartTime, sourceOffset, sourceDuration);
         this.currentSources.push(source);
