@@ -68,15 +68,29 @@ export class AudioConcatenator {
     let offset = 0;
 
     // WAV Header
-    // ChunkID "RIFF"
-    view.setUint32(offset, 0x46464952, false); offset += 4;
-    // ChunkSize
+    // ChunkID "RIFF" 
+    const riffId = new TextEncoder().encode('RIFF');
+    view.setUint8(offset++, riffId[0]);
+    view.setUint8(offset++, riffId[1]);
+    view.setUint8(offset++, riffId[2]);
+    view.setUint8(offset++, riffId[3]);
+    
+    // ChunkSize (file size - 8)
     view.setUint32(offset, bufferSize - 8, true); offset += 4;
+    
     // Format "WAVE"
-    view.setUint32(offset, 0x45564157, false); offset += 4;
+    const waveId = new TextEncoder().encode('WAVE');
+    view.setUint8(offset++, waveId[0]);
+    view.setUint8(offset++, waveId[1]);
+    view.setUint8(offset++, waveId[2]);
+    view.setUint8(offset++, waveId[3]);
     
     // Subchunk1ID "fmt "
-    view.setUint32(offset, 0x20746d66, false); offset += 4;
+    const fmtId = new TextEncoder().encode('fmt ');
+    view.setUint8(offset++, fmtId[0]);
+    view.setUint8(offset++, fmtId[1]);
+    view.setUint8(offset++, fmtId[2]);
+    view.setUint8(offset++, fmtId[3]);
     // Subchunk1Size (16 for PCM)
     view.setUint32(offset, 16, true); offset += 4;
     // AudioFormat (1 for PCM)
@@ -93,7 +107,11 @@ export class AudioConcatenator {
     view.setUint16(offset, bitDepth, true); offset += 2;
     
     // Subchunk2ID "data"
-    view.setUint32(offset, 0x61746164, false); offset += 4;
+    const dataId = new TextEncoder().encode('data');
+    view.setUint8(offset++, dataId[0]);
+    view.setUint8(offset++, dataId[1]);
+    view.setUint8(offset++, dataId[2]);
+    view.setUint8(offset++, dataId[3]);
     // Subchunk2Size
     view.setUint32(offset, dataSize, true); offset += 4;
 
@@ -136,7 +154,19 @@ export class AudioConcatenator {
       maxSample,
       minSample,
       finalOffset: offset,
-      expectedSize: bufferSize
+      expectedSize: bufferSize,
+      headerValid: offset === bufferSize
+    });
+    
+    // Verify WAV header integrity
+    const headerView = new Uint8Array(arrayBuffer, 0, 44);
+    console.log('WAV Export: Header verification', {
+      riff: String.fromCharCode.apply(null, Array.from(headerView.slice(0, 4))),
+      wave: String.fromCharCode.apply(null, Array.from(headerView.slice(8, 12))),
+      fmt: String.fromCharCode.apply(null, Array.from(headerView.slice(12, 16))),
+      data: String.fromCharCode.apply(null, Array.from(headerView.slice(36, 40))),
+      fileSize: new DataView(arrayBuffer).getUint32(4, true) + 8,
+      dataSize: new DataView(arrayBuffer).getUint32(40, true)
     });
 
     const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
