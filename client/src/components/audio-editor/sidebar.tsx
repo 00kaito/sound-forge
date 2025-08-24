@@ -101,10 +101,7 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
   };
 
   const tools = [
-    { id: 'cut', icon: Scissors, label: 'Cut' },
-    { id: 'fade', icon: Volume2, label: 'Fade' },
-    { id: 'volume', icon: Volume2, label: 'Volume' },
-    { id: 'effects', icon: Wand2, label: 'Effects' }
+    { id: 'cut', icon: Scissors, label: 'Cut' }
   ];
 
   return (
