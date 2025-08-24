@@ -107,9 +107,15 @@ export class AudioEngine {
     const panNode = this.trackPans.get(trackId);
     if (panNode) {
       panNode.pan.value = pan;
-      console.log('Audio Engine: Track pan updated', { trackId, pan });
+      console.log('Audio Engine: Track pan updated', { 
+        trackId, 
+        pan, 
+        actualValue: panNode.pan.value,
+        hasConnections: panNode.numberOfInputs > 0
+      });
     } else {
       console.warn('Audio Engine: No pan node found for track', trackId);
+      console.log('Audio Engine: Available pan nodes:', Array.from(this.trackPans.keys()));
     }
   }
 
@@ -263,13 +269,23 @@ export class AudioEngine {
       
       // Connect to track gain node for real-time track-level volume/pan control
       const trackGain = this.trackGains.get(clip.trackId);
-      if (trackGain) {
+      const trackPan = this.trackPans.get(clip.trackId);
+      if (trackGain && trackPan) {
         clipGainNode.connect(trackGain);
-        console.log('Audio Engine: Connected clip to track gain', { clipId: clip.id, trackId: clip.trackId });
+        console.log('Audio Engine: Connected clip to track gain+pan', { 
+          clipId: clip.id, 
+          trackId: clip.trackId, 
+          gainValue: trackGain.gain.value,
+          panValue: trackPan.pan.value
+        });
       } else {
         // Fallback to master gain if track gain doesn't exist
         clipGainNode.connect(this.masterGain);
-        console.warn('Audio Engine: No track gain found, connecting to master', clip.trackId);
+        console.warn('Audio Engine: No track gain/pan found, connecting to master', { 
+          trackId: clip.trackId,
+          hasGain: !!trackGain,
+          hasPan: !!trackPan
+        });
       }
       
       // Calculate timing first
