@@ -1,0 +1,54 @@
+@radix-ui_react-dialog.js?v=2577ad34:339 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+use-local-audio-storage.tsx:112 LocalAudioStorage: getAudioFile called with ID local-1756003123673-uxy9vk2xh
+use-local-audio-storage.tsx:113 LocalAudioStorage: Available files: 
+[{…}]
+use-local-audio-storage.tsx:115 LocalAudioStorage: Found file: 
+{id: 'local-1756003123673-uxy9vk2xh', name: '820330__jadis0x__simple-melody-loop'}
+audio-concatenator.ts:177 Timeline Render: Starting render 
+{tracksCount: 3, clipsCount: 1, totalDuration: 16, sampleRate: 44100}
+audio-concatenator.ts:188 Timeline Render: Buffer specs 
+{length: 705600, lengthSeconds: 16, numberOfChannels: 2}
+audio-concatenator.ts:200 Timeline Render: Created output buffer 
+{duration: 16, length: 705600, channels: 2}
+audio-concatenator.ts:216 Timeline Render: Processing clips 
+{totalClips: 1}
+audio-concatenator.ts:219 Timeline Render: Processing clip 
+{clipId: 'clip-1756003127946-y7nq6', audioFileId: 'local-1756003123673-uxy9vk2xh', startTime: 0, duration: 16}
+use-local-audio-storage.tsx:112 LocalAudioStorage: getAudioFile called with ID local-1756003123673-uxy9vk2xh
+use-local-audio-storage.tsx:113 LocalAudioStorage: Available files: 
+[{…}]
+use-local-audio-storage.tsx:115 LocalAudioStorage: Found file: 
+{id: 'local-1756003123673-uxy9vk2xh', name: '820330__jadis0x__simple-melody-loop'}
+audio-concatenator.ts:233 Timeline Render: Found source buffer 
+{sourceDuration: 16, sourceLength: 705600, sourceChannels: 2}
+audio-concatenator.ts:252 Timeline Render: Copying audio data 
+{startSample: 0, clipDurationSamples: 705600, outputLength: 705600, sourceLength: 705600}
+audio-concatenator.ts:275 Timeline Render: Audio data copied successfully
+audio-concatenator.ts:279 Timeline Render: Clip processed 
+{processedClips: 1, totalClips: 1, progress: 80}
+editor.tsx:273 Export progress: 80%
+audio-concatenator.ts:286 Timeline Render: All clips processed
+audio-concatenator.ts:289 Timeline Render: Starting normalization at 85%
+editor.tsx:273 Export progress: 85%
+audio-concatenator.ts:413 Normalize: Starting normalization 
+{channels: 2, length: 705600, duration: 16}
+audio-concatenator.ts:426 Normalize: Processing channel 0/2
+audio-concatenator.ts:426 Normalize: Processing channel 1/2
+audio-concatenator.ts:444 Normalize: Max value found: 0.6789932250976562
+audio-concatenator.ts:469 Normalize: No scaling needed, maxValue within range
+audio-concatenator.ts:472 Normalize: Normalization complete
+audio-concatenator.ts:294 Timeline Render: Normalization complete
+audio-concatenator.ts:299 Timeline Render: Completing at 100%
+editor.tsx:273 Export progress: 100%
+editor.tsx:278 Export: Rendered buffer info 
+{channels: 2, sampleRate: 44100, length: 705600, duration: 16, selectedFormat: 'wav'}
+audio-concatenator.ts:39 WAV Export: Converting buffer 
+{channels: 2, sampleRate: 44100, length: 705600, duration: 16}
+audio-concatenator.ts:57 WAV Export: Header info 
+{bytesPerSample: 2, blockAlign: 4, byteRate: 176400, dataSize: 2822400, bufferSize: 2822444}
+audio-concatenator.ts:134 WAV Export: Audio stats 
+{hasAudio: true, maxSample: 0.6789932250976562, minSample: -0.47910207509994507, finalOffset: 2822444, expectedSize: 2822444}
+audio-concatenator.ts:143 WAV Export: Created blob 
+{size: 2822444, type: 'audio/wav'}
+﻿
+
