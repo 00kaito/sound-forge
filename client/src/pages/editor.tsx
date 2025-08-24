@@ -161,37 +161,37 @@ export default function AudioEditor() {
       
       // Handle mute/solo changes - need to update all tracks
       if (updates.muted !== undefined || updates.solo !== undefined) {
-        // Update all tracks to handle solo logic properly
-        setTimeout(() => {
-          const updatedTracks = tracks.map(track => 
-            track.id === trackId ? { ...track, ...updates } : track
-          );
+        // Get current tracks state with this update applied
+        const updatedTracks = tracks.map(track => 
+          track.id === trackId ? { ...track, ...updates } : track
+        );
+        
+        const hasSoloedTracks = updatedTracks.some(t => t.solo);
+        
+        // Apply solo/mute logic to all tracks immediately
+        updatedTracks.forEach(track => {
+          let effectiveVolume = track.volume;
           
-          const hasSoloedTracks = updatedTracks.some(t => t.solo);
+          if (track.muted) {
+            effectiveVolume = 0;
+          } else if (hasSoloedTracks) {
+            // If any track is solo'd, non-solo tracks should be muted
+            effectiveVolume = track.solo ? track.volume : 0;
+          }
           
-          updatedTracks.forEach(track => {
-            let effectiveVolume = track.volume;
-            
-            if (track.muted) {
-              effectiveVolume = 0;
-            } else if (hasSoloedTracks) {
-              // If any track is solo'd, non-solo tracks should be muted
-              effectiveVolume = track.solo ? track.volume : 0;
-            }
-            
-            setTrackVolume(track.id, effectiveVolume);
-          });
-          
-          console.log('All tracks mute/solo updated:', { 
-            hasSoloedTracks,
-            tracks: updatedTracks.map(t => ({ 
-              id: t.id, 
-              muted: t.muted, 
-              solo: t.solo, 
-              volume: t.volume 
-            }))
-          });
-        }, 0);
+          setTrackVolume(track.id, effectiveVolume);
+        });
+        
+        console.log('All tracks mute/solo updated:', { 
+          hasSoloedTracks,
+          updatedTrackId: trackId,
+          tracks: updatedTracks.map(t => ({ 
+            id: t.id, 
+            muted: t.muted, 
+            solo: t.solo, 
+            effectiveVolume: t.muted ? 0 : (hasSoloedTracks ? (t.solo ? t.volume : 0) : t.volume)
+          }))
+        });
       }
     }
   };
@@ -472,11 +472,11 @@ export default function AudioEditor() {
           ));
           
           for (const fileId of Array.from(uniqueFileIds)) {
-            const audioFile = getAudioFile(fileId);
+            const audioFile = getAudioFile(fileId as string);
             if (audioFile && isInitialized) {
               try {
                 console.log('Loading audio file into engine after import:', fileId, audioFile.name);
-                await loadAudioFile(fileId, audioFile.file);
+                await loadAudioFile(fileId as string, audioFile.file);
               } catch (error) {
                 console.error('Error loading audio file into engine:', fileId, error);
               }

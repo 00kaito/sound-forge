@@ -247,7 +247,17 @@ export class AudioEngine {
       source.buffer = audioBuffer;
       source.connect(gainNode);
       gainNode.connect(panNode);
-      panNode.connect(this.masterGain);
+      
+      // Connect to track gain node for real-time volume/pan control
+      const trackGain = this.trackGains.get(clip.trackId);
+      if (trackGain) {
+        panNode.connect(trackGain);
+        console.log('Audio Engine: Connected clip to track gain', { clipId: clip.id, trackId: clip.trackId });
+      } else {
+        // Fallback to master gain if track gain doesn't exist
+        panNode.connect(this.masterGain);
+        console.warn('Audio Engine: No track gain found, connecting to master', clip.trackId);
+      }
       
       // Calculate timing first
       let sourceStartTime = audioContextStartTime;
