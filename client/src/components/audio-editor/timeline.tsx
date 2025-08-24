@@ -192,6 +192,7 @@ export function Timeline({
     const mouseX = e.clientX - rect.left;
     const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
     setMousePosition(timeAtCursor);
+    console.log('Cursor debug:', { mouseX, pixelsPerSecond, timeAtCursor, zoomLevel });
   };
 
   const handleTimelineMouseLeave = () => {
@@ -351,6 +352,10 @@ export function Timeline({
         if (x + textWidth + 4 < width) {
           ctx.fillText(timeText, x + 2, height - 15);
           lastLabelX = x;
+          // Debug first few labels
+          if (time <= timeInterval * 3) {
+            console.log('Ruler debug:', { time, x, pixelsPerSecond, zoomLevel, timeText });
+          }
         }
       }
     }
