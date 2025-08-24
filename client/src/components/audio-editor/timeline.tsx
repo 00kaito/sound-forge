@@ -76,7 +76,7 @@ export function Timeline({
   const [initialZoom, setInitialZoom] = useState(0);
 
   const updateZoom = (newZoom: number) => {
-    const clampedZoom = Math.min(Math.max(newZoom, 0.01), 800);
+    const clampedZoom = Math.min(Math.max(newZoom, 0.01), 2000);
     onUpdateProjectData?.({ zoomLevel: clampedZoom });
   };
   
@@ -137,7 +137,7 @@ export function Timeline({
       // Calculate maximum zoom where content still fits
       const maxPixelsPerSecond = availableWidth / maxEndTime;
       const maxZoomForFit = (maxPixelsPerSecond / basePixelsPerSecond) * 100;
-      const targetZoom = Math.min(800, maxZoomForFit * 0.9); // 90% of max to leave some padding
+      const targetZoom = Math.min(2000, maxZoomForFit * 0.9); // 90% of max to leave some padding
       
       // Only zoom in if it would be significantly higher than current
       if (targetZoom > zoomLevel * 1.2) {
@@ -160,7 +160,7 @@ export function Timeline({
     if (maxEndTime > 7200) minZoom = 0.1; // 2+ hours: 0.1%
     if (maxEndTime > 10800) minZoom = 0.05; // 3+ hours: 0.05%
     
-    const newZoom = Math.max(minZoom, Math.min(800, calculatedZoom));
+    const newZoom = Math.max(minZoom, Math.min(2000, calculatedZoom));
     updateZoom(newZoom);
   };
   
@@ -198,8 +198,8 @@ export function Timeline({
         ? zoomLevel * zoomFactor 
         : zoomLevel / zoomFactor;
       
-      // Clamp zoom between 0.01% and 800% for very long audio support
-      const clampedZoom = Math.max(0.01, Math.min(800, newZoom));
+      // Clamp zoom between 0.01% and 2000% for very long audio support
+      const clampedZoom = Math.max(0.01, Math.min(2000, newZoom));
       updateZoom(clampedZoom);
     }
   };
