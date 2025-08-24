@@ -314,7 +314,16 @@ export function Timeline({
     
     let lastLabelX = -minSpacing; // Track last label position to prevent overlap
     
-    for (let time = 0; time < width / pixelsPerSecond; time += timeInterval) {
+    // Calculate actual audio duration from all clips
+    const allClips = tracks.flatMap(track => track.clips);
+    const maxAudioTime = allClips.length > 0 
+      ? Math.max(...allClips.map(clip => clip.startTime + clip.duration))
+      : 60; // Default 60s if no clips
+    
+    // Use actual audio duration instead of canvas width
+    const maxTimeToRender = Math.max(maxAudioTime, width / pixelsPerSecond);
+    
+    for (let time = 0; time < maxTimeToRender; time += timeInterval) {
       const x = time * pixelsPerSecond;
       
       // Draw tick mark
@@ -336,7 +345,7 @@ export function Timeline({
 
   useEffect(() => {
     renderTimelineRuler();
-  }, [pixelsPerSecond, formatTime]);
+  }, [pixelsPerSecond, formatTime, tracks]);
 
   const playheadPosition = playbackState.currentTime * pixelsPerSecond;
 
