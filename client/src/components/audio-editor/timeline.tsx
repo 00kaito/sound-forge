@@ -367,7 +367,7 @@ export function Timeline({
       style={{ cursor: isDragging ? 'ew-resize' : 'default' }}
     >
       {/* Zoom Controls */}
-      <div className="flex items-center justify-between p-2 border-b border-gray-700">
+      <div className="flex items-center justify-between p-3 border-b border-gray-700/50 bg-gradient-to-r from-slate-900/30 to-slate-800/30 backdrop-blur-sm">
         <div className="flex items-center space-x-4">
           {/* Zoom Controls */}
           <div className="flex items-center space-x-2">
@@ -375,7 +375,7 @@ export function Timeline({
               onClick={handleZoomOut}
               variant="outline"
               size="sm"
-              className="text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400"
+              className="text-white bg-gradient-to-r from-slate-700/80 to-slate-600/80 border-slate-500/60 hover:from-slate-600/90 hover:to-slate-500/90 hover:border-slate-400/70 backdrop-blur-sm shadow-lg"
               title="Zoom Out"
             >
               <Minus className="w-4 h-4" />
@@ -387,7 +387,7 @@ export function Timeline({
               onClick={handleZoomIn}
               variant="outline"
               size="sm"
-              className="text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400"
+              className="text-white bg-gradient-to-r from-slate-700/80 to-slate-600/80 border-slate-500/60 hover:from-slate-600/90 hover:to-slate-500/90 hover:border-slate-400/70 backdrop-blur-sm shadow-lg"
               title="Zoom In"
             >
               <Plus className="w-4 h-4" />
@@ -396,7 +396,7 @@ export function Timeline({
               onClick={handleAutoFit}
               variant="outline"
               size="sm"
-              className="text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400"
+              className="text-white bg-gradient-to-r from-slate-700/80 to-slate-600/80 border-slate-500/60 hover:from-slate-600/90 hover:to-slate-500/90 hover:border-slate-400/70 backdrop-blur-sm shadow-lg"
               title="Auto-fit to content"
               onMouseDown={(e) => e.stopPropagation()}
               onMouseUp={(e) => e.stopPropagation()}
@@ -420,8 +420,8 @@ export function Timeline({
               size="sm"
               className={`${
                 currentTool === 'cut' 
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white border-2 border-blue-500 hover:border-blue-400' 
-                  : 'text-white bg-slate-700 border-slate-500 hover:bg-slate-600 hover:border-slate-400'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-2 border-blue-500/60 hover:border-blue-400/80 shadow-lg' 
+                  : 'text-white bg-gradient-to-r from-slate-700/80 to-slate-600/80 border-slate-500/60 hover:from-slate-600/90 hover:to-slate-500/90 hover:border-slate-400/70 backdrop-blur-sm shadow-lg'
               }`}
               title="Cut Tool - Click clips to split or drag to select region"
               data-testid="button-tool-cut"
@@ -510,7 +510,7 @@ export function Timeline({
                 onClick={onAddTrack}
                 variant="secondary"
                 size="sm"
-                className="bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400"
+                className="bg-gradient-to-r from-slate-700/80 to-slate-600/80 hover:from-slate-600/90 hover:to-slate-500/90 text-white border border-slate-500/60 hover:border-slate-400/70 backdrop-blur-sm shadow-lg"
                 data-testid="button-add-track"
               >
                 <Plus className="w-4 h-4 mr-2" />

@@ -42,10 +42,10 @@ export function Toolbar({
   };
 
   return (
-    <header className="panel-bg border-b border-gray-700 p-3 flex items-center justify-between">
+    <header className="panel-bg border-b border-gray-700/50 p-4 flex items-center justify-between shadow-lg rounded-t-lg">
       <div className="flex items-center space-x-4">
-        <h1 className="text-xl font-bold text-blue-500">
-          <i className="fas fa-waveform-lines mr-2"></i>
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent">
+          <i className="fas fa-waveform-lines mr-2 text-blue-400"></i>
           AudioForge
         </h1>
         <div className="hidden md:flex space-x-2">
@@ -53,7 +53,7 @@ export function Toolbar({
             onClick={onOpenProject}
             variant="secondary"
             size="sm"
-            className="bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400"
+            className="bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white border border-slate-500/50 hover:border-slate-400/60 shadow-lg backdrop-blur-sm"
             data-testid="button-open-project"
           >
             <FolderOpen className="w-4 h-4 mr-1" />
@@ -63,7 +63,7 @@ export function Toolbar({
             onClick={onSaveProject}
             variant="secondary"
             size="sm"
-            className="bg-slate-600 hover:bg-slate-500 text-white border border-slate-500 hover:border-slate-400"
+            className="bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white border border-slate-500/50 hover:border-slate-400/60 shadow-lg backdrop-blur-sm"
             data-testid="button-save-project"
           >
             <Save className="w-4 h-4 mr-1" />
@@ -76,7 +76,7 @@ export function Toolbar({
       <div className="flex items-center space-x-2">
         <Button
           onClick={handlePlay}
-          className="w-10 h-10 bg-blue-600 hover:bg-blue-500 text-white border-2 border-blue-500 hover:border-blue-400 rounded-full p-0 shadow-lg"
+          className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white border-2 border-blue-400/60 hover:border-blue-300/80 rounded-full p-0 shadow-xl backdrop-blur-sm transition-all duration-200 hover:scale-105"
           data-testid="button-play-pause"
         >
           {playbackState.isPlaying ? (
@@ -105,7 +105,7 @@ export function Toolbar({
         </Button>
         
         {/* Time Display */}
-        <div className="bg-black px-3 py-1 rounded font-mono text-sm" data-testid="text-time-display">
+        <div className="bg-gradient-to-r from-gray-900/80 to-black/80 px-4 py-2 rounded-lg font-mono text-sm backdrop-blur-sm border border-gray-700/50 shadow-lg" data-testid="text-time-display">
           <span>{formatTime(playbackState.currentTime)}</span>
           <span className="text-gray-400 mx-1">/</span>
           <span className="text-gray-400">{formatTime(playbackState.totalDuration)}</span>

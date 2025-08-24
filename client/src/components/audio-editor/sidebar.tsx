@@ -152,7 +152,7 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 hover:border-blue-400"
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-500/60 hover:border-blue-400/80 shadow-lg backdrop-blur-sm"
                   data-testid="button-merge-files"
                 >
                   <Link2 className="w-4 h-4 mr-2" />
@@ -270,7 +270,7 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
         {audioFiles.map((file: LocalAudioFile) => (
           <div
             key={file.id}
-            className="bg-track-bg rounded p-3 mb-2 cursor-pointer hover:bg-gray-600 transition-colors group"
+            className="bg-track-bg rounded-lg p-4 mb-3 cursor-pointer hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-600/60 transition-all duration-200 group shadow-lg border border-gray-700/30 backdrop-blur-sm"
             draggable
             onDragStart={(e) => {
               e.dataTransfer.setData('audio-file', JSON.stringify({

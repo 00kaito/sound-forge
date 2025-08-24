@@ -51,13 +51,16 @@
   --tracking-normal: 0em;
   --spacing: 0.25rem;
   
-  /* Audio Editor Custom Colors */
-  --editor-bg: hsl(0 0% 10.2%);
-  --panel-bg: hsl(0 0% 17.6%);
-  --accent-blue: hsl(202.8 100% 40%);
-  --track-bg: hsl(0 0% 14.5%);
-  --waveform: hsl(195 100% 64.3%);
-  --selection: hsl(213 41.7% 30.6%);
+  /* Audio Editor Custom Colors - MODERN PREVIEW */
+  --editor-bg: linear-gradient(135deg, hsl(240 8% 8%) 0%, hsl(220 12% 12%) 100%);
+  --panel-bg: linear-gradient(135deg, hsl(240 8% 16%) 0%, hsl(220 12% 20%) 100%);
+  --accent-blue: hsl(210 100% 55%);
+  --track-bg: linear-gradient(135deg, hsl(240 8% 12%) 0%, hsl(220 12% 16%) 100%);
+  --waveform: hsl(195 100% 70%);
+  --selection: hsl(213 60% 40%);
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --modern-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .dark {
@@ -117,19 +120,29 @@
   }
 }
 
-/* Audio Editor Specific Styles */
+/* Audio Editor Specific Styles - MODERN PREVIEW */
 .audio-editor {
-  background-color: var(--editor-bg);
+  background: var(--editor-bg);
   color: white;
   font-family: var(--font-sans);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .panel-bg {
-  background-color: var(--panel-bg);
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--modern-shadow);
 }
 
 .track-bg {
-  background-color: var(--track-bg);
+  background: var(--track-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
 }
 
 .waveform-color {
@@ -212,4 +225,42 @@ input[type="range"]::-moz-range-thumb {
 
 .cut-tool-active * {
   cursor: crosshair !important;
+}
+
+/* 
+MODERN PREVIEW - TO REVERT CHANGES:
+Replace the following CSS variables and classes with original values:
+
+ORIGINAL VALUES:
+--editor-bg: hsl(0 0% 10.2%);
+--panel-bg: hsl(0 0% 17.6%);
+--accent-blue: hsl(202.8 100% 40%);
+--track-bg: hsl(0 0% 14.5%);
+--waveform: hsl(195 100% 64.3%);
+--selection: hsl(213 41.7% 30.6%);
+
+.audio-editor {
+  background-color: var(--editor-bg);
+  color: white;
+  font-family: var(--font-sans);
+}
+
+.panel-bg {
+  background-color: var(--panel-bg);
+}
+
+.track-bg {
+  background-color: var(--track-bg);
+}
+
+Also revert button classes in toolbar.tsx, timeline.tsx, and sidebar.tsx
+to use original solid colors instead of gradients.
+*/
+
+/* Modern background pattern */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
 }
