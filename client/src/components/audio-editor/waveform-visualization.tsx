@@ -38,16 +38,36 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
   };
 
   const drawPlaceholderWaveform = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    const barCount = Math.min(w / 4, 50);
+    const centerY = h / 2;
+    const barCount = Math.min(w / 3, 80);
     const barWidth = w / barCount;
+    
+    // Create gradient for placeholder
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.4)');
 
     for (let i = 0; i < barCount; i++) {
-      const barHeight = Math.random() * h * 0.8 + h * 0.1;
-      const x = i * barWidth;
-      const y = (h - barHeight) / 2;
+      // Generate more realistic waveform pattern
+      const time = (i / barCount) * Math.PI * 4;
+      const baseHeight = (Math.sin(time) * 0.3 + 0.3) * h * 0.6;
+      const randomVariation = (Math.random() - 0.5) * h * 0.4;
+      const barHeight = Math.max(h * 0.1, Math.abs(baseHeight + randomVariation));
       
-      ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
+      const x = i * barWidth;
+      const y = centerY - barHeight / 2;
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x + 0.5, y, barWidth - 1, barHeight);
+      
+      // Add some variation with peaks
+      if (Math.random() > 0.7) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        const peakHeight = barHeight * 1.3;
+        const peakY = centerY - peakHeight / 2;
+        ctx.fillRect(x + barWidth * 0.3, peakY, barWidth * 0.4, peakHeight);
+      }
     }
   };
 
@@ -65,35 +85,131 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
     const endSample = Math.min(startSample + Math.floor(duration * sampleRate), data.length);
     const samplesPerPixel = Math.max(1, Math.floor((endSample - startSample) / w));
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 1;
-
     const centerY = h / 2;
     
-    // Draw waveform
-    ctx.beginPath();
-    ctx.moveTo(0, centerY);
+    // Create enhanced gradient for clips
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
+    gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.3)');
+    gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.3)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.7)');
     
+    // Enhanced multi-layer rendering
     for (let x = 0; x < w; x++) {
       const sampleIndex = startSample + Math.floor(x * samplesPerPixel);
       if (sampleIndex >= data.length) break;
       
-      // Calculate RMS for this pixel
-      let sum = 0;
+      // Enhanced analysis with peak and RMS detection
+      let sumSquares = 0;
+      let maxPeak = 0;
+      let minPeak = 0;
+      let highFreqEnergy = 0;
       let count = 0;
+      
       for (let i = 0; i < samplesPerPixel && sampleIndex + i < data.length; i++) {
         const sample = data[sampleIndex + i];
-        sum += sample * sample;
+        sumSquares += sample * sample;
+        maxPeak = Math.max(maxPeak, sample);
+        minPeak = Math.min(minPeak, sample);
+        
+        // Calculate high-frequency content
+        if (i > 0 && sampleIndex + i - 1 < data.length) {
+          const prevSample = data[sampleIndex + i - 1];
+          const diff = sample - prevSample;
+          highFreqEnergy += diff * diff;
+        }
         count++;
       }
       
-      const rms = Math.sqrt(sum / count);
-      const amplitude = rms * (h / 2) * 0.9; // Scale to 90% of half height
+      if (count === 0) continue;
       
-      // Draw positive and negative parts
-      ctx.fillRect(x, centerY - amplitude, 1, amplitude * 2);
+      const rms = Math.sqrt(sumSquares / count);
+      const peakAmplitude = Math.max(Math.abs(maxPeak), Math.abs(minPeak));
+      const highFreq = Math.sqrt(highFreqEnergy / count);
+      
+      // Layer 1: RMS body (main waveform)
+      const rmsHeight = rms * (h / 2) * 0.8;
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x, centerY - rmsHeight, 1, rmsHeight * 2);
+      
+      // Layer 2: Peak details for transients
+      if (peakAmplitude > rms * 1.5) {
+        const peakHeight = peakAmplitude * (h / 2) * 0.9;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillRect(x, centerY - peakHeight, 1, 2);
+        ctx.fillRect(x, centerY + peakHeight - 1, 1, 2);
+      }
+      
+      // Layer 3: High-frequency content highlighting
+      if (highFreq > 0.1 && samplesPerPixel > 4) {
+        const hfHeight = highFreq * (h / 2) * 0.4;
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.6)'; // Golden color for brightness
+        ctx.fillRect(x, centerY - hfHeight, 1, hfHeight * 2);
+      }
+      
+      // Layer 4: Detailed micro-structure for high zoom
+      if (samplesPerPixel <= 2 && x % 2 === 0) {
+        // Show individual sample points when very zoomed in
+        const sampleValue = data[sampleIndex];
+        const sampleY = centerY - (sampleValue * h * 0.9 / 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(x, sampleY - 0.5, 1, 1);
+      }
     }
+    
+    // Add subtle outline for definition
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    
+    // Draw smooth envelope outline
+    for (let x = 0; x < w; x++) {
+      const sampleIndex = startSample + Math.floor(x * samplesPerPixel);
+      if (sampleIndex >= data.length) break;
+      
+      let sumSquares = 0;
+      let count = 0;
+      for (let i = 0; i < samplesPerPixel && sampleIndex + i < data.length; i++) {
+        const sample = data[sampleIndex + i];
+        sumSquares += sample * sample;
+        count++;
+      }
+      
+      if (count === 0) continue;
+      
+      const rms = Math.sqrt(sumSquares / count);
+      const amplitude = rms * (h / 2) * 0.8;
+      
+      if (x === 0) {
+        ctx.moveTo(x, centerY - amplitude);
+      } else {
+        ctx.lineTo(x, centerY - amplitude);
+      }
+    }
+    
+    // Complete the envelope
+    for (let x = w - 1; x >= 0; x--) {
+      const sampleIndex = startSample + Math.floor(x * samplesPerPixel);
+      if (sampleIndex >= data.length) continue;
+      
+      let sumSquares = 0;
+      let count = 0;
+      for (let i = 0; i < samplesPerPixel && sampleIndex + i < data.length; i++) {
+        const sample = data[sampleIndex + i];
+        sumSquares += sample * sample;
+        count++;
+      }
+      
+      if (count === 0) continue;
+      
+      const rms = Math.sqrt(sumSquares / count);
+      const amplitude = rms * (h / 2) * 0.8;
+      
+      ctx.lineTo(x, centerY + amplitude);
+    }
+    
+    ctx.closePath();
+    ctx.stroke();
   };
 
   return (

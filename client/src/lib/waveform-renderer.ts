@@ -62,7 +62,6 @@ export class WaveformRenderer {
 
     const channelData = this.audioBuffer.getChannelData(0);
     const sampleRate = this.audioBuffer.sampleRate;
-    const duration = this.audioBuffer.duration;
     
     // Calculate visible time range
     const timePerPixel = 1 / this.pixelsPerSecond;
@@ -75,64 +74,118 @@ export class WaveformRenderer {
     
     if (startSample >= endSample) return;
 
-    // Draw waveform
-    this.ctx.strokeStyle = '#4fc3f7';
-    this.ctx.lineWidth = 1;
-    this.ctx.beginPath();
-
     const samplesPerPixel = Math.max(1, (endSample - startSample) / width);
+    const centerY = height / 2;
     
+    // Create gradient for more appealing visuals
+    const gradient = this.ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(79, 195, 247, 0.8)');
+    gradient.addColorStop(0.5, 'rgba(79, 195, 247, 0.4)');
+    gradient.addColorStop(1, 'rgba(79, 195, 247, 0.8)');
+    
+    // Enhanced waveform rendering with peak and RMS detection
     for (let x = 0; x < width; x++) {
       const sampleIndex = Math.floor(startSample + (x * samplesPerPixel));
       
       if (sampleIndex >= channelData.length) break;
       
-      // Calculate RMS for this pixel to get average amplitude
-      let sum = 0;
-      const samplesToAverage = Math.floor(samplesPerPixel);
+      // Enhanced analysis - get both peak and RMS for this pixel
+      let sumSquares = 0;
+      let maxPeak = 0;
+      let minPeak = 0;
+      const samplesToAnalyze = Math.max(1, Math.floor(samplesPerPixel));
       
-      for (let i = 0; i < samplesToAverage && sampleIndex + i < channelData.length; i++) {
+      for (let i = 0; i < samplesToAnalyze && sampleIndex + i < channelData.length; i++) {
         const sample = channelData[sampleIndex + i];
-        sum += sample * sample;
+        sumSquares += sample * sample;
+        maxPeak = Math.max(maxPeak, sample);
+        minPeak = Math.min(minPeak, sample);
       }
       
-      const rms = Math.sqrt(sum / samplesToAverage);
-      const amplitude = rms * height * 0.8; // 80% of height
+      const rms = Math.sqrt(sumSquares / samplesToAnalyze);
+      const peakAmplitude = Math.max(Math.abs(maxPeak), Math.abs(minPeak));
       
-      const y1 = (height / 2) - amplitude;
-      const y2 = (height / 2) + amplitude;
+      // Use RMS for body and peak for spikes
+      const rmsHeight = rms * height * 0.7;
+      const peakHeight = peakAmplitude * height * 0.9;
       
-      if (x === 0) {
-        this.ctx.moveTo(x, y1);
-      } else {
-        this.ctx.lineTo(x, y1);
+      // Draw RMS body (main waveform)
+      this.ctx.fillStyle = gradient;
+      this.ctx.fillRect(x, centerY - rmsHeight, 1, rmsHeight * 2);
+      
+      // Draw peak lines for detail
+      if (peakHeight > rmsHeight) {
+        this.ctx.fillStyle = 'rgba(79, 195, 247, 0.9)';
+        this.ctx.fillRect(x, centerY - peakHeight, 1, 2); // Top peak
+        this.ctx.fillRect(x, centerY + peakHeight - 1, 1, 2); // Bottom peak
+      }
+      
+      // Add frequency-based coloring for high-frequency content
+      if (samplesPerPixel > 1) {
+        let highFreqEnergy = 0;
+        for (let i = 1; i < samplesToAnalyze && sampleIndex + i < channelData.length; i++) {
+          const diff = channelData[sampleIndex + i] - channelData[sampleIndex + i - 1];
+          highFreqEnergy += diff * diff;
+        }
+        
+        if (highFreqEnergy > 0.01) {
+          this.ctx.fillStyle = 'rgba(255, 215, 0, 0.4)'; // Gold for high freq
+          const hfHeight = Math.sqrt(highFreqEnergy) * height * 0.3;
+          this.ctx.fillRect(x, centerY - hfHeight, 1, hfHeight * 2);
+        }
       }
     }
     
-    // Draw the bottom half (mirrored)
+    // Add subtle outline for definition
+    this.ctx.strokeStyle = 'rgba(79, 195, 247, 0.6)';
+    this.ctx.lineWidth = 0.5;
+    this.ctx.beginPath();
+    
+    // Draw outline following the RMS envelope
+    for (let x = 0; x < width; x++) {
+      const sampleIndex = Math.floor(startSample + (x * samplesPerPixel));
+      
+      if (sampleIndex >= channelData.length) break;
+      
+      let sumSquares = 0;
+      const samplesToAnalyze = Math.max(1, Math.floor(samplesPerPixel));
+      
+      for (let i = 0; i < samplesToAnalyze && sampleIndex + i < channelData.length; i++) {
+        const sample = channelData[sampleIndex + i];
+        sumSquares += sample * sample;
+      }
+      
+      const rms = Math.sqrt(sumSquares / samplesToAnalyze);
+      const amplitude = rms * height * 0.7;
+      
+      if (x === 0) {
+        this.ctx.moveTo(x, centerY - amplitude);
+      } else {
+        this.ctx.lineTo(x, centerY - amplitude);
+      }
+    }
+    
+    // Complete the outline
     for (let x = width - 1; x >= 0; x--) {
       const sampleIndex = Math.floor(startSample + (x * samplesPerPixel));
       
       if (sampleIndex >= channelData.length) continue;
       
-      let sum = 0;
-      const samplesToAverage = Math.floor(samplesPerPixel);
+      let sumSquares = 0;
+      const samplesToAnalyze = Math.max(1, Math.floor(samplesPerPixel));
       
-      for (let i = 0; i < samplesToAverage && sampleIndex + i < channelData.length; i++) {
+      for (let i = 0; i < samplesToAnalyze && sampleIndex + i < channelData.length; i++) {
         const sample = channelData[sampleIndex + i];
-        sum += sample * sample;
+        sumSquares += sample * sample;
       }
       
-      const rms = Math.sqrt(sum / samplesToAverage);
-      const amplitude = rms * height * 0.8;
-      const y2 = (height / 2) + amplitude;
+      const rms = Math.sqrt(sumSquares / samplesToAnalyze);
+      const amplitude = rms * height * 0.7;
       
-      this.ctx.lineTo(x, y2);
+      this.ctx.lineTo(x, centerY + amplitude);
     }
     
     this.ctx.closePath();
-    this.ctx.fillStyle = 'rgba(79, 195, 247, 0.3)';
-    this.ctx.fill();
     this.ctx.stroke();
   }
 
