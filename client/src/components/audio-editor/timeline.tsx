@@ -25,6 +25,7 @@ interface TimelineProps {
   onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
   onToolChange?: (tool: string) => void;
   onAddTrack?: () => void;
+  onSaveState?: (tracks: any[], action: string) => void;
 }
 
 export function Timeline({
@@ -46,7 +47,8 @@ export function Timeline({
   selectedTrackId,
   onSelectionChange,
   onToolChange,
-  onAddTrack
+  onAddTrack,
+  onSaveState
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -404,6 +406,7 @@ export function Timeline({
               selectionEnd={selectionEnd}
               selectedTrackId={selectedTrackId}
               onSelectionChange={onSelectionChange}
+              onSaveState={onSaveState}
               data-testid="waveform-canvas"
             />
           </div>

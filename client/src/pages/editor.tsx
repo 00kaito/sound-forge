@@ -305,10 +305,10 @@ export default function AudioEditor() {
   };
 
   const updateClip = (clipId: string, updates: Partial<AudioClip>) => {
-    // Save state for significant changes (position, duration, but not fade adjustments)
-    const isSignificantChange = updates.startTime !== undefined || updates.duration !== undefined;
-    if (isSignificantChange) {
-      saveState(tracks, 'Move/resize clip');
+    // Only save state for duration changes, not position changes during drag
+    const isDurationChange = updates.duration !== undefined;
+    if (isDurationChange) {
+      saveState(tracks, 'Resize clip');
     }
     
     setTracks(tracks.map(track => ({
@@ -790,6 +790,7 @@ export default function AudioEditor() {
           }}
           onToolChange={setCurrentTool}
           onAddTrack={addTrack}
+          onSaveState={saveState}
           data-testid="timeline"
         />
       </div>

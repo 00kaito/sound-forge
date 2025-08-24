@@ -9,6 +9,7 @@ interface WaveformCanvasProps {
   onTrackDrop: (e: React.DragEvent, trackId: string) => void;
   onUpdateClip: (clipId: string, updates: Partial<AudioClip>) => void;
   onDeleteClip: (clipId: string) => void;
+  onSaveState?: (tracks: any[], action: string) => void;
   currentTool?: string;
   onSplitClip?: (clipId: string, splitTime: number) => void;
   onCutRegion?: (trackId: string, startTime: number, endTime: number) => void;
@@ -31,12 +32,14 @@ export function WaveformCanvas({
   selectionStart,
   selectionEnd,
   selectedTrackId,
-  onSelectionChange
+  onSelectionChange,
+  onSaveState
 }: WaveformCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggedClip, setDraggedClip] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStarted, setDragStarted] = useState(false);
+  const [initialClipPosition, setInitialClipPosition] = useState<{ clipId: string, startTime: number } | null>(null);
   const [fadeEditMode, setFadeEditMode] = useState<{ clipId: string, type: 'fadeIn' | 'fadeOut' } | null>(null);
   const [isDraggingFade, setIsDraggingFade] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -109,14 +112,15 @@ export function WaveformCanvas({
       setFadeEditMode({ clipId: clip.id, type: 'fadeOut' });
       setIsDraggingFade(true);
     } else {
-      // Regular clip dragging - save state once at the start of drag
+      // Regular clip dragging - save initial position for undo
       setDraggedClip(clip.id);
       setDragOffset({
         x: clickX,
         y: e.clientY - rect.top
       });
       
-      // Set flag to save state on first move
+      // Save initial clip position for potential undo
+      setInitialClipPosition({ clipId: clip.id, startTime: clip.startTime });
       setDragStarted(false);
     }
   };
@@ -150,8 +154,19 @@ export function WaveformCanvas({
   };
 
   const handleClipMouseUp = () => {
+    // Save state after clip movement if position changed
+    if (draggedClip && initialClipPosition && onSaveState) {
+      // Find current clip to check if position actually changed
+      const currentClip = tracks.flatMap(t => t.clips).find(c => c.id === draggedClip);
+      if (currentClip && Math.abs(currentClip.startTime - initialClipPosition.startTime) > 0.01) {
+        // Position changed significantly, save the previous state for undo
+        onSaveState(tracks, 'Move clip');
+      }
+    }
+    
     setDraggedClip(null);
     setDragOffset({ x: 0, y: 0 });
+    setInitialClipPosition(null);
     setFadeEditMode(null);
     setIsDraggingFade(false);
     
