@@ -24,6 +24,7 @@ interface TimelineProps {
   selectedTrackId?: string | null;
   onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
   onToolChange?: (tool: string) => void;
+  onAddTrack?: () => void;
 }
 
 export function Timeline({
@@ -44,7 +45,8 @@ export function Timeline({
   selectionEnd,
   selectedTrackId,
   onSelectionChange,
-  onToolChange
+  onToolChange,
+  onAddTrack
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -356,6 +358,22 @@ export function Timeline({
               data-testid={`track-header-${track.id}`}
             />
           ))}
+          
+          {/* Add Track Button */}
+          {onAddTrack && (
+            <div className="h-24 flex items-center justify-center border-b border-gray-700">
+              <Button
+                onClick={onAddTrack}
+                variant="secondary"
+                size="sm"
+                className="bg-gray-700 hover:bg-gray-600 text-gray-300"
+                data-testid="button-add-track"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Track
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Waveform/Timeline Area */}

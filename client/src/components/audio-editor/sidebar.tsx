@@ -328,18 +328,6 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
         )}
       </div>
       
-      {/* Add Track Button */}
-      <div className="p-4 border-t border-gray-700">
-        <Button
-          onClick={onAddTrack}
-          variant="secondary"
-          className="w-full bg-gray-700 hover:bg-gray-600"
-          data-testid="button-add-track"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Track
-        </Button>
-      </div>
     </aside>
   );
 }
