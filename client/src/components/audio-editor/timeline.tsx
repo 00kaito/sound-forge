@@ -55,6 +55,9 @@ export function Timeline({
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
   
+  // Mouse cursor position tracking
+  const [mousePosition, setMousePosition] = useState<number | null>(null);
+  
   // Use zoomLevel from projectData or default
   const zoomLevel = projectData.zoomLevel || 100;
   const pixelsPerSecond = 100 * (zoomLevel / 100);
@@ -144,6 +147,18 @@ export function Timeline({
       updateZoom(newZoom);
     }
   };
+
+  const handleTimelineMouseMove = (e: React.MouseEvent) => {
+    // Track mouse position for cursor time display
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
+    setMousePosition(timeAtCursor);
+  };
+
+  const handleTimelineMouseLeave = () => {
+    setMousePosition(null);
+  };
   
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -217,17 +232,43 @@ export function Timeline({
     ctx.fillStyle = '#2d2d30';
     ctx.fillRect(0, 0, width, height);
     
-    // Draw time markers
+    // Draw time markers with improved scaling
     ctx.fillStyle = '#ffffff';
-    ctx.font = '10px Inter';
     
-    // Calculate appropriate time interval based on zoom level
+    // Calculate appropriate time interval and font size based on zoom level
     let timeInterval = 1;
-    if (pixelsPerSecond > 200) timeInterval = 0.5; // Every 0.5s when zoomed in
-    else if (pixelsPerSecond > 100) timeInterval = 1; // Every 1s at normal zoom
-    else if (pixelsPerSecond > 50) timeInterval = 2; // Every 2s when zoomed out
-    else if (pixelsPerSecond > 25) timeInterval = 5; // Every 5s when very zoomed out
-    else timeInterval = 10; // Every 10s when extremely zoomed out
+    let fontSize = 10;
+    let minSpacing = 80; // Minimum pixels between labels to avoid overlap
+    
+    if (pixelsPerSecond > 400) {
+      timeInterval = 0.1; // Every 0.1s when very zoomed in
+      fontSize = 9;
+      minSpacing = 60;
+    } else if (pixelsPerSecond > 200) {
+      timeInterval = 0.5; // Every 0.5s when zoomed in  
+      fontSize = 10;
+      minSpacing = 70;
+    } else if (pixelsPerSecond > 100) {
+      timeInterval = 1; // Every 1s at normal zoom
+      fontSize = 10;
+      minSpacing = 80;
+    } else if (pixelsPerSecond > 50) {
+      timeInterval = 2; // Every 2s when zoomed out
+      fontSize = 10;
+      minSpacing = 90;
+    } else if (pixelsPerSecond > 25) {
+      timeInterval = 5; // Every 5s when very zoomed out
+      fontSize = 10;
+      minSpacing = 100;
+    } else {
+      timeInterval = 10; // Every 10s when extremely zoomed out
+      fontSize = 10;
+      minSpacing = 120;
+    }
+    
+    ctx.font = `${fontSize}px Inter`;
+    
+    let lastLabelX = -minSpacing; // Track last label position to prevent overlap
     
     for (let time = 0; time < width / pixelsPerSecond; time += timeInterval) {
       const x = time * pixelsPerSecond;
@@ -235,9 +276,16 @@ export function Timeline({
       // Draw tick mark
       ctx.fillRect(x, height - 10, 1, 10);
       
-      // Draw time label
-      if (x > 20) { // Avoid overlapping with first label
-        ctx.fillText(formatTime(time), x + 2, height - 15);
+      // Draw time label only if there's enough space
+      if (x > 20 && x - lastLabelX >= minSpacing) {
+        const timeText = formatTime(time);
+        const textWidth = ctx.measureText(timeText).width;
+        
+        // Only draw if it fits without overlap
+        if (x + textWidth + 4 < width) {
+          ctx.fillText(timeText, x + 2, height - 15);
+          lastLabelX = x;
+        }
       }
     }
   };
@@ -390,9 +438,13 @@ export function Timeline({
         </div>
 
         {/* Waveform/Timeline Area */}
-        <div className={`flex-1 overflow-x-auto overflow-y-auto relative bg-editor-bg ${
-          currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
-        }`}>
+        <div 
+          className={`flex-1 overflow-x-auto overflow-y-auto relative bg-editor-bg ${
+            currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
+          }`}
+          onMouseMove={handleTimelineMouseMove}
+          onMouseLeave={handleTimelineMouseLeave}
+        >
           <div className="min-w-max" style={{ width: Math.max(1200, (playbackState.totalDuration || 60) * pixelsPerSecond + 200) }}>
             <WaveformCanvas
               tracks={tracks}
@@ -413,6 +465,13 @@ export function Timeline({
               data-testid="waveform-canvas"
             />
           </div>
+          
+          {/* Cursor Time Display */}
+          {mousePosition !== null && (
+            <div className="absolute top-2 left-2 bg-gray-800 text-white px-3 py-1 rounded-md text-sm font-mono border border-gray-600 pointer-events-none z-10">
+              {formatTime(mousePosition)}
+            </div>
+          )}
           
           {/* Zoom Hint */}
           {isDragging && (

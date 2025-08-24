@@ -513,7 +513,7 @@ export default function AudioEditor() {
           if (track.id === targetTrackId) {
             return {
               ...track,
-              clips: [...track.clips, clipToMove]
+              clips: [...track.clips, clipToMove as AudioClip]
             };
           }
           return track;
