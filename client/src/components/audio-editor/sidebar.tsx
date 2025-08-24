@@ -345,7 +345,14 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
                   ? 'bg-blue-600 hover:bg-blue-700' 
                   : 'bg-track-bg hover:bg-gray-600'
               }`}
-              onClick={() => onToolChange(tool.id)}
+              onClick={() => {
+                // Toggle off if tool is already selected
+                if (currentTool === tool.id) {
+                  onToolChange('select');
+                } else {
+                  onToolChange(tool.id);
+                }
+              }}
               data-testid={`button-tool-${tool.id}`}
             >
               <tool.icon className="w-4 h-4 mb-1" />

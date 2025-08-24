@@ -245,7 +245,9 @@ export function WaveformCanvas({
         {tracks.map((track, trackIndex) => (
           <div
             key={track.id}
-            className="h-24 border-b border-gray-700 relative flex items-center justify-center"
+            className={`h-24 border-b border-gray-700 relative flex items-center justify-center ${
+              currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
+            }`}
             onDragOver={handleTrackDragOver}
             onDrop={(e) => {
               console.log('WaveformCanvas: Drop event on track', track.id);
@@ -266,7 +268,9 @@ export function WaveformCanvas({
             {currentTool === 'cut' && 
              selectedTrackId === track.id && 
              selectionStart !== null && 
-             selectionEnd !== null && (
+             selectionEnd !== null && 
+             typeof selectionStart !== 'undefined' && 
+             typeof selectionEnd !== 'undefined' && (
               <div
                 className="absolute top-0 bottom-0 bg-red-500 bg-opacity-30 border border-red-500 pointer-events-none z-10"
                 style={{

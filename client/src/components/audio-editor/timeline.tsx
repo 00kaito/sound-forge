@@ -329,7 +329,9 @@ export function Timeline({
         </div>
 
         {/* Waveform/Timeline Area */}
-        <div className="flex-1 overflow-x-auto overflow-y-auto relative bg-editor-bg">
+        <div className={`flex-1 overflow-x-auto overflow-y-auto relative bg-editor-bg ${
+          currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
+        }`}>
           <div className="min-w-max" style={{ width: Math.max(1200, (playbackState.totalDuration || 60) * pixelsPerSecond + 200) }}>
             <WaveformCanvas
               tracks={tracks}

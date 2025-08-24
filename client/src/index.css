@@ -199,3 +199,17 @@ input[type="range"]::-moz-range-thumb {
   border: none;
   cursor: pointer;
 }
+
+/* Cut tool cursor */
+.cursor-cut {
+  cursor: crosshair !important;
+}
+
+/* Add visual feedback when cut tool is active */
+.cut-tool-active {
+  cursor: crosshair !important;
+}
+
+.cut-tool-active * {
+  cursor: crosshair !important;
+}
