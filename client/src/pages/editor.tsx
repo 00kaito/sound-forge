@@ -21,7 +21,10 @@ export default function AudioEditor() {
     pause, 
     stop, 
     seekTo,
-    setTimelineData
+    setTimelineData,
+    setTrackVolume,
+    setTrackPan,
+    createTrackGain
   } = useAudioEngine();
   const { audioFiles, getAudioFile, loadAudioBuffer, addAudioFile, removeAudioFile, concatenateFiles, exportProject, importProject } = useLocalAudioStorage();
   const { toast } = useToast();
@@ -106,10 +109,20 @@ export default function AudioEditor() {
   // Update timeline data in audio engine whenever tracks change
   useEffect(() => {
     if (isInitialized) {
+      // Create track gains for all tracks
+      tracks.forEach(track => {
+        createTrackGain(track.id);
+        // Initialize track settings in audio engine
+        setTrackVolume(track.id, track.muted ? 0 : track.volume);
+        setTrackPan(track.id, track.pan);
+      });
+      
       const allClips = tracks.flatMap(track => track.clips);
       setTimelineData(tracks, allClips);
+      
+      console.log('Audio Engine: Initialized track gains and settings');
     }
-  }, [tracks, isInitialized, setTimelineData]);
+  }, [tracks, isInitialized, setTimelineData, createTrackGain, setTrackVolume, setTrackPan]);
 
   const addTrack = () => {
     const newTrack: Track = {
@@ -128,6 +141,59 @@ export default function AudioEditor() {
     setTracks(tracks.map(track => 
       track.id === trackId ? { ...track, ...updates } : track
     ));
+    
+    // Update audio engine with new track settings
+    if (isInitialized) {
+      // Create track gain if it doesn't exist
+      createTrackGain(trackId);
+      
+      // Apply volume changes
+      if (updates.volume !== undefined) {
+        setTrackVolume(trackId, updates.volume);
+        console.log('Track volume updated:', trackId, updates.volume);
+      }
+      
+      // Apply pan changes
+      if (updates.pan !== undefined) {
+        setTrackPan(trackId, updates.pan);
+        console.log('Track pan updated:', trackId, updates.pan);
+      }
+      
+      // Handle mute/solo changes - need to update all tracks
+      if (updates.muted !== undefined || updates.solo !== undefined) {
+        // Update all tracks to handle solo logic properly
+        setTimeout(() => {
+          const updatedTracks = tracks.map(track => 
+            track.id === trackId ? { ...track, ...updates } : track
+          );
+          
+          const hasSoloedTracks = updatedTracks.some(t => t.solo);
+          
+          updatedTracks.forEach(track => {
+            let effectiveVolume = track.volume;
+            
+            if (track.muted) {
+              effectiveVolume = 0;
+            } else if (hasSoloedTracks) {
+              // If any track is solo'd, non-solo tracks should be muted
+              effectiveVolume = track.solo ? track.volume : 0;
+            }
+            
+            setTrackVolume(track.id, effectiveVolume);
+          });
+          
+          console.log('All tracks mute/solo updated:', { 
+            hasSoloedTracks,
+            tracks: updatedTracks.map(t => ({ 
+              id: t.id, 
+              muted: t.muted, 
+              solo: t.solo, 
+              volume: t.volume 
+            }))
+          });
+        }, 0);
+      }
+    }
   };
 
   const addClipToTrack = async (trackId: string, clip: AudioClip) => {
@@ -401,11 +467,11 @@ export default function AudioEditor() {
           setTracks(updatedTracks);
           
           // Load all audio files into audio engine first
-          const uniqueFileIds = new Set(updatedTracks.flatMap(track => 
-            track.clips.map(clip => clip.audioFileId)
+          const uniqueFileIds = new Set(updatedTracks.flatMap((track: Track) => 
+            track.clips.map((clip: AudioClip) => clip.audioFileId)
           ));
           
-          for (const fileId of uniqueFileIds) {
+          for (const fileId of Array.from(uniqueFileIds)) {
             const audioFile = getAudioFile(fileId);
             if (audioFile && isInitialized) {
               try {
