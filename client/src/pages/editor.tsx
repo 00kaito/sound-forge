@@ -370,9 +370,63 @@ export default function AudioEditor() {
       try {
         const projectData = await importProject(file);
         
-        // Load project data
+        // Create mapping from old audioFileId to new audioFileId based on filenames
+        const audioFileMapping = new Map<string, string>();
+        
+        if (projectData.audioFiles) {
+          for (const savedFile of projectData.audioFiles) {
+            const currentFile = audioFiles.find(af => af.name === savedFile.originalName);
+            if (currentFile) {
+              audioFileMapping.set(savedFile.id, currentFile.id);
+              console.log('Audio file mapping:', savedFile.id, '->', currentFile.id, savedFile.originalName);
+            }
+          }
+        }
+        
+        // Load project data with remapped audio file IDs
         if (projectData.tracks) {
-          setTracks(projectData.tracks);
+          const updatedTracks = projectData.tracks.map((track: Track) => ({
+            ...track,
+            clips: track.clips.map((clip: AudioClip) => {
+              const newAudioFileId = audioFileMapping.get(clip.audioFileId);
+              if (newAudioFileId) {
+                return { ...clip, audioFileId: newAudioFileId };
+              }
+              console.warn('No mapping found for audio file ID:', clip.audioFileId);
+              return clip;
+            })
+          }));
+          
+          console.log('Setting tracks with updated audio file IDs');
+          setTracks(updatedTracks);
+          
+          // Load all audio files into audio engine first
+          const uniqueFileIds = new Set(updatedTracks.flatMap(track => 
+            track.clips.map(clip => clip.audioFileId)
+          ));
+          
+          for (const fileId of uniqueFileIds) {
+            const audioFile = getAudioFile(fileId);
+            if (audioFile && isInitialized) {
+              try {
+                console.log('Loading audio file into engine after import:', fileId, audioFile.name);
+                await loadAudioFile(fileId, audioFile.file);
+              } catch (error) {
+                console.error('Error loading audio file into engine:', fileId, error);
+              }
+            }
+          }
+          
+          // Update audio engine with new timeline data
+          const allClips = updatedTracks.flatMap((track: Track) => track.clips);
+          setTimelineData(updatedTracks, allClips);
+          
+          console.log('Timeline data updated in audio engine', {
+            tracks: updatedTracks.length,
+            clips: allClips.length,
+            mappings: audioFileMapping.size,
+            loadedFiles: uniqueFileIds.size
+          });
         }
         
         // Check if required audio files are available
