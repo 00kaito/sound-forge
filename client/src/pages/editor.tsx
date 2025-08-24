@@ -239,6 +239,11 @@ export default function AudioEditor() {
   const addClipToTrack = async (trackId: string, clip: AudioClip) => {
     console.log('Editor: addClipToTrack called', { trackId, clipId: clip.id, clipName: clip.name });
     
+    // Check if this will be the first clip in the entire project
+    const totalClips = tracks.flatMap(track => track.clips).length;
+    const isFirstClip = totalClips === 0;
+    console.log('Editor: Is first clip?', isFirstClip, 'Total clips:', totalClips);
+    
     // Load the audio file into both local storage and audio engine
     console.log('Editor: Looking for audio file with ID', clip.audioFileId);
     console.log('Editor: Available audio files:', audioFiles.map(f => ({ id: f.id, name: f.name })));
@@ -302,6 +307,23 @@ export default function AudioEditor() {
       console.log('Editor: New tracks state', newTracks.map(t => ({ id: t.id, clipCount: t.clips.length })));
       return newTracks;
     });
+    
+    // Auto-fit after adding the first clip
+    if (isFirstClip) {
+      console.log('Editor: Auto-fitting after first clip');
+      // Delay auto-fit slightly to ensure tracks state is updated
+      setTimeout(() => {
+        // Calculate auto-fit zoom based on new audio duration
+        const maxEndTime = clip.startTime + clip.duration;
+        const availableWidth = 1600; // Approximate timeline width
+        const paddedWidth = availableWidth - 100;
+        const targetPixelsPerSecond = paddedWidth / maxEndTime;
+        const newZoom = Math.max(0.01, Math.min(800, targetPixelsPerSecond));
+        
+        updateProjectData({ zoomLevel: newZoom });
+        console.log('Editor: Auto-fit zoom applied:', newZoom);
+      }, 100);
+    }
   };
 
   const updateClip = (clipId: string, updates: Partial<AudioClip>) => {
