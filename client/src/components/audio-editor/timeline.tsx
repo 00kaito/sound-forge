@@ -58,8 +58,8 @@ export function Timeline({
   // Mouse cursor position tracking
   const [mousePosition, setMousePosition] = useState<number | null>(null);
   
-  // Use zoomLevel from projectData or default
-  const zoomLevel = projectData.zoomLevel || 100;
+  // Use zoomLevel from projectData or default to 25%
+  const zoomLevel = projectData.zoomLevel || 25;
   const pixelsPerSecond = 100 * (zoomLevel / 100);
   
   // Mouse drag state for zooming
@@ -106,7 +106,7 @@ export function Timeline({
     // Find all clips from all tracks
     const allClips = tracks.flatMap(track => track.clips);
     if (allClips.length === 0) {
-      updateZoom(100);
+      updateZoom(25);
       return;
     }
     
@@ -124,7 +124,9 @@ export function Timeline({
     const targetPixelsPerSecond = paddedWidth / maxEndTime;
     
     // Convert to zoom percentage (100 pixels per second = 100% zoom)
-    const newZoom = Math.max(25, Math.min(800, targetPixelsPerSecond));
+    // For very long audio, allow zoom as low as 1% to fit everything
+    const minZoom = maxEndTime > 1800 ? 1 : 10; // If longer than 30 minutes, allow very low zoom
+    const newZoom = Math.max(minZoom, Math.min(800, targetPixelsPerSecond));
     updateZoom(newZoom);
   };
   
@@ -158,6 +160,25 @@ export function Timeline({
 
   const handleTimelineMouseLeave = () => {
     setMousePosition(null);
+  };
+
+  // Scroll wheel zoom handler
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      
+      // Determine zoom direction based on wheel delta
+      const zoomDirection = e.deltaY > 0 ? -1 : 1;
+      const zoomFactor = 1.1; // 10% zoom per scroll step
+      
+      const newZoom = zoomDirection > 0 
+        ? zoomLevel * zoomFactor 
+        : zoomLevel / zoomFactor;
+      
+      // Clamp zoom between 1% and 800%
+      const clampedZoom = Math.max(1, Math.min(800, newZoom));
+      updateZoom(clampedZoom);
+    }
   };
   
   const handleMouseUp = () => {
@@ -370,7 +391,7 @@ export function Timeline({
           </div>
         </div>
         <div className="text-xs text-gray-400">
-          Shift + drag to zoom
+          Shift + drag/scroll to zoom
         </div>
       </div>
       
@@ -451,6 +472,7 @@ export function Timeline({
           }`}
           onMouseMove={handleTimelineMouseMove}
           onMouseLeave={handleTimelineMouseLeave}
+          onWheel={handleWheel}
         >
           <div className="min-w-max" style={{ width: Math.max(1200, (playbackState.totalDuration || 60) * pixelsPerSecond + 200) }}>
             <WaveformCanvas
