@@ -439,8 +439,8 @@ export function Timeline({
               const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
               setMousePosition(timeAtCursor);
               
-              // Also update tracks cursor position to stay in sync
-              setTracksCursorPosition(mouseX);
+              // Update tracks cursor position based on audio time
+              setTracksCursorPosition(timeAtCursor * pixelsPerSecond);
             }}
             onMouseLeave={() => {
               setMousePosition(null);
@@ -514,9 +514,10 @@ export function Timeline({
             const mouseX = e.clientX - rect.left;
             const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
             
-            // Update both cursor systems with synchronized values
+            // Update time position (used for tooltip and cursor line calculation)
             setMousePosition(timeAtCursor);
-            setTracksCursorPosition(mouseX);
+            // Cursor line position will be calculated from time, not pixels
+            setTracksCursorPosition(timeAtCursor * pixelsPerSecond);
           }}
           onMouseLeave={() => {
             setMousePosition(null);
