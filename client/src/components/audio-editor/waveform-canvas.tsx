@@ -156,12 +156,19 @@ export function WaveformCanvas({
       const newStartTime = Math.max(0, newX / pixelsPerSecond);
       
       // Calculate which track the clip is being dragged over
-      const mouseY = e.clientY - rect.top;
-      const trackIndex = Math.floor(mouseY / TRACK_HEIGHT);
-      const targetTrack = tracks[trackIndex];
-      
-      if (targetTrack) {
-        setDraggedOverTrackId(targetTrack.id);
+      // Find the waveform container to get proper coordinates
+      const waveformContainer = e.currentTarget.closest('.relative.w-full') as HTMLElement;
+      if (waveformContainer) {
+        const containerRect = waveformContainer.getBoundingClientRect();
+        const mouseY = e.clientY - containerRect.top;
+        const trackIndex = Math.floor(mouseY / TRACK_HEIGHT);
+        const targetTrack = tracks[trackIndex];
+        
+        if (targetTrack && trackIndex >= 0 && trackIndex < tracks.length) {
+          setDraggedOverTrackId(targetTrack.id);
+        } else {
+          setDraggedOverTrackId(null);
+        }
       }
       
       onUpdateClip(draggedClip, { startTime: newStartTime });
@@ -335,12 +342,10 @@ export function WaveformCanvas({
                   }}
                   onMouseDown={(e) => handleClipMouseDown(e, clip)}
                   onDoubleClick={() => {
-                    console.log('WaveformCanvas: Deleting clip', clip.id);
                     onDeleteClip(clip.id);
                   }}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    console.log('WaveformCanvas: Right-click delete clip', clip.id);
                     onDeleteClip(clip.id);
                   }}
                   title={`${clip.name} - Double-click or right-click to delete`}
