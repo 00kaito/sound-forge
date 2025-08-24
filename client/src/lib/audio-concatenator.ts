@@ -291,13 +291,14 @@ export class AudioConcatenator {
         const sourceChannelData = sourceBuffer.getChannelData(channel);
         const outputChannelData = outputBuffer.getChannelData(channel);
         
-        // Copy sample by sample with bounds checking
+        // Mix audio by adding samples together (not replacing)
         for (let i = 0; i < clipDurationSamples; i++) {
           const outputIndex = startSample + i;
           if (outputIndex < outputBuffer.length && i < sourceBuffer.length) {
-            // Apply track volume (default 1.0)
+            // Apply track volume (default 1.0) and ADD to existing content
             const volume = track.volume || 1.0;
-            outputChannelData[outputIndex] = sourceChannelData[i] * volume;
+            const newSample = sourceChannelData[i] * volume;
+            outputChannelData[outputIndex] += newSample; // ADD instead of REPLACE
           }
         }
       }
