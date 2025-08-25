@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Plus, Minus, Maximize2, Scissors } from 'lucide-react';
+import { Plus, Minus, Maximize2, Scissors, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TrackHeader } from '@/components/audio-editor/track-header';
 import { WaveformCanvas } from '@/components/audio-editor/waveform-canvas';
@@ -28,6 +28,8 @@ interface TimelineProps {
   onMoveClipBetweenTracks?: (clipId: string, targetTrackId: string) => void;
   onSaveState?: (tracks: any[], action: string) => void;
   loadingTracks?: Set<string>;
+  onImportTranscript?: () => void;
+  onAddEffects?: () => void;
 }
 
 export function Timeline({
@@ -52,7 +54,9 @@ export function Timeline({
   onAddTrack,
   onMoveClipBetweenTracks,
   onSaveState,
-  loadingTracks
+  loadingTracks,
+  onImportTranscript,
+  onAddEffects
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -420,13 +424,35 @@ export function Timeline({
               size="sm"
               className={`${
                 currentTool === 'cut' 
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border-2 border-blue-500/60 hover:border-blue-400/80 shadow-lg' 
+                  ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400 text-white border-2 border-red-400/60 hover:border-red-300/80 shadow-lg' 
                   : 'text-white bg-gradient-to-r from-slate-700/80 to-slate-600/80 border-slate-500/60 hover:from-slate-600/90 hover:to-slate-500/90 hover:border-slate-400/70 backdrop-blur-sm shadow-lg'
               }`}
               title="Cut Tool - Click clips to split or drag to select region"
               data-testid="button-tool-cut"
             >
               <Scissors className="w-4 h-4" />
+            </Button>
+            
+            <Button
+              onClick={onImportTranscript}
+              variant="outline"
+              size="sm"
+              className="text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 border border-emerald-400/60 hover:border-emerald-300/80 backdrop-blur-sm shadow-lg transition-all duration-200 hover:scale-105"
+              title="Import Transcript - Import SRT subtitles for timeline navigation"
+              data-testid="button-tool-transcript"
+            >
+              <FileText className="w-4 h-4" />
+            </Button>
+            
+            <Button
+              onClick={onAddEffects}
+              variant="outline"
+              size="sm"
+              className="text-white bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 border border-purple-400/60 hover:border-purple-300/80 backdrop-blur-sm shadow-lg transition-all duration-200 hover:scale-105"
+              title="Add Effects - Add sound effects to timeline"
+              data-testid="button-tool-effects"
+            >
+              <Sparkles className="w-4 h-4" />
             </Button>
           </div>
         </div>

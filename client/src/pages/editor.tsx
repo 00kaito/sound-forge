@@ -1114,6 +1114,8 @@ export default function AudioEditor() {
           onMoveClipBetweenTracks={moveClipBetweenTracks}
           onSaveState={saveState}
           loadingTracks={loadingTracks}
+          onImportTranscript={handleImportTranscript}
+          onAddEffects={() => setIsEffectsModalOpen(true)}
           data-testid="timeline"
         />
         

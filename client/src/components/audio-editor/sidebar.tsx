@@ -192,36 +192,6 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
           </div>
         )}
         
-        {/* Tools Section */}
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold mb-3 text-gray-300">Tools</h4>
-          <div className="grid grid-cols-1 gap-2">
-            {tools.map((tool) => {
-              const Icon = tool.icon;
-              const handleClick = () => {
-                if (tool.onClick) {
-                  tool.onClick();
-                } else if (tool.id === 'cut') {
-                  onToolChange(tool.id);
-                }
-              };
-              
-              return (
-                <Button
-                  key={tool.id}
-                  onClick={handleClick}
-                  variant="secondary"
-                  size="sm"
-                  className={`w-full bg-gradient-to-r ${tool.gradient} text-white border ${tool.borderColor} shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 active:scale-95`}
-                  data-testid={`button-tool-${tool.id}`}
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {tool.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
         
         {/* Merge Files Button */}
         {audioFiles.length > 1 && (
