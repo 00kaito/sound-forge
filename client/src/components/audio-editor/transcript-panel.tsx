@@ -62,7 +62,7 @@ export function TranscriptPanel({
       
       const newWidth = window.innerWidth - e.clientX;
       const minWidth = 250;
-      const maxWidth = 600;
+      const maxWidth = Math.min(800, window.innerWidth - 400); // Max width based on screen size
       
       onWidthChange(Math.max(minWidth, Math.min(maxWidth, newWidth)));
     };
@@ -92,14 +92,23 @@ export function TranscriptPanel({
       style={{ width: `${displayWidth}px`, minWidth: isCollapsed ? '40px' : '250px' }}
       data-testid="transcript-panel"
     >
-      {/* Resize Handle */}
+      {/* Resize Handle - visible border that extends beyond panel */}
       {!isCollapsed && (
         <div
-          className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors z-50 bg-transparent"
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize border-l-2 border-blue-500/60 hover:border-blue-400 transition-colors z-50"
           onMouseDown={handleMouseDown}
           data-testid="transcript-resize-handle"
-          style={{ marginLeft: '-4px' }} // Extend outside the panel for easier grabbing
-        />
+          style={{ 
+            marginLeft: '-3px',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderRadius: '2px 0 0 2px'
+          }}
+        >
+          {/* Visual indicator */}
+          <div className="absolute inset-y-0 left-0 w-full flex items-center justify-center">
+            <div className="w-0.5 h-8 bg-blue-400 rounded-full opacity-60"></div>
+          </div>
+        </div>
       )}
 
       {/* Header */}
