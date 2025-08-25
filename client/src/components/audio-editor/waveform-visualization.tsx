@@ -1,20 +1,46 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AudioClip } from '@/types/audio';
 import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
+import { spectrogramAnalyzer, SpectrogramData } from '@/lib/spectrogram-analyzer';
 
 interface WaveformVisualizationProps {
   clip: AudioClip;
   width: number;
   height: number;
+  showSpectrogram?: boolean;
+  zoomLevel?: number;
 }
 
-export function WaveformVisualization({ clip, width, height }: WaveformVisualizationProps) {
+export function WaveformVisualization({ clip, width, height, showSpectrogram = false, zoomLevel }: WaveformVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { getAudioFile } = useLocalAudioStorage();
+  const [spectrogramData, setSpectrogramData] = useState<SpectrogramData | null>(null);
 
   useEffect(() => {
-    drawWaveform();
-  }, [clip.audioFileId, clip.offset, clip.duration, width, height]);
+    if (showSpectrogram) {
+      loadSpectrogramData();
+    } else {
+      drawWaveform();
+    }
+  }, [clip.audioFileId, clip.offset, clip.duration, width, height, showSpectrogram, zoomLevel]);
+
+  const loadSpectrogramData = async () => {
+    const audioFile = getAudioFile(clip.audioFileId);
+    if (!audioFile?.audioBuffer) return;
+
+    try {
+      const data = await spectrogramAnalyzer.analyzeAudioBuffer(
+        audioFile.audioBuffer, 
+        clip.audioFileId,
+        zoomLevel
+      );
+      setSpectrogramData(data);
+      drawSpectrogram(data);
+    } catch (error) {
+      console.error('Failed to load spectrogram data:', error);
+      drawWaveform(); // Fallback to waveform
+    }
+  };
 
   const drawWaveform = () => {
     const canvas = canvasRef.current;
@@ -103,7 +129,6 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
       let sumSquares = 0;
       let maxPeak = 0;
       let minPeak = 0;
-      let highFreqEnergy = 0;
       let count = 0;
       
       for (let i = 0; i < samplesPerPixel && sampleIndex + i < data.length; i++) {
@@ -111,13 +136,6 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
         sumSquares += sample * sample;
         maxPeak = Math.max(maxPeak, sample);
         minPeak = Math.min(minPeak, sample);
-        
-        // Calculate high-frequency content
-        if (i > 0 && sampleIndex + i - 1 < data.length) {
-          const prevSample = data[sampleIndex + i - 1];
-          const diff = sample - prevSample;
-          highFreqEnergy += diff * diff;
-        }
         count++;
       }
       
@@ -125,35 +143,18 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
       
       const rms = Math.sqrt(sumSquares / count);
       const peakAmplitude = Math.max(Math.abs(maxPeak), Math.abs(minPeak));
-      const highFreq = Math.sqrt(highFreqEnergy / count);
       
-      // Layer 1: RMS body (main waveform)
+      // Clean waveform visualization - RMS body
       const rmsHeight = rms * (h / 2) * 0.8;
       ctx.fillStyle = gradient;
       ctx.fillRect(x, centerY - rmsHeight, 1, rmsHeight * 2);
       
-      // Layer 2: Peak details for transients
+      // Peak details for transients
       if (peakAmplitude > rms * 1.5) {
         const peakHeight = peakAmplitude * (h / 2) * 0.9;
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.fillRect(x, centerY - peakHeight, 1, 2);
         ctx.fillRect(x, centerY + peakHeight - 1, 1, 2);
-      }
-      
-      // Layer 3: High-frequency content highlighting
-      if (highFreq > 0.1 && samplesPerPixel > 4) {
-        const hfHeight = highFreq * (h / 2) * 0.4;
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.6)'; // Golden color for brightness
-        ctx.fillRect(x, centerY - hfHeight, 1, hfHeight * 2);
-      }
-      
-      // Layer 4: Detailed micro-structure for high zoom
-      if (samplesPerPixel <= 2 && x % 2 === 0) {
-        // Show individual sample points when very zoomed in
-        const sampleValue = data[sampleIndex];
-        const sampleY = centerY - (sampleValue * h * 0.9 / 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(x, sampleY - 0.5, 1, 1);
       }
     }
     
@@ -210,6 +211,81 @@ export function WaveformVisualization({ clip, width, height }: WaveformVisualiza
     
     ctx.closePath();
     ctx.stroke();
+  };
+
+  const drawSpectrogram = (data: SpectrogramData) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    const { frequencies, timeStep, frequencyBins, maxFrequency } = data;
+    if (frequencies.length === 0) return;
+
+    // Calculate display parameters
+    const timeRange = clip.duration;
+    const startTimeIndex = Math.floor(clip.offset / timeStep);
+    const endTimeIndex = Math.min(startTimeIndex + Math.floor(timeRange / timeStep), frequencies.length);
+    const visibleFrames = endTimeIndex - startTimeIndex;
+
+    if (visibleFrames <= 0) return;
+
+    // Frequency range (focus on audible range)
+    const minDisplayFreq = 0;
+    const maxDisplayFreq = Math.min(maxFrequency, 8000); // Focus on 0-8kHz for better visual density
+    const minBin = spectrogramAnalyzer.frequencyToBin(minDisplayFreq, maxFrequency * 2);
+    const maxBin = spectrogramAnalyzer.frequencyToBin(maxDisplayFreq, maxFrequency * 2);
+
+    // Draw spectrogram
+    const timePixelWidth = width / visibleFrames;
+    const freqPixelHeight = height / (maxBin - minBin);
+
+    for (let timeIndex = 0; timeIndex < visibleFrames; timeIndex++) {
+      const frameIndex = startTimeIndex + timeIndex;
+      if (frameIndex >= frequencies.length) break;
+
+      const frame = frequencies[frameIndex];
+      const x = timeIndex * timePixelWidth;
+
+      for (let binIndex = minBin; binIndex < maxBin; binIndex++) {
+        if (binIndex >= frame.length) break;
+
+        // Convert magnitude to color intensity
+        const magnitude = frame[binIndex];
+        const normalizedMag = Math.max(0, (magnitude + 100) / 100); // Normalize from dB scale
+        const intensity = Math.min(1, normalizedMag);
+
+        // Create color based on frequency and intensity
+        const freqRatio = (binIndex - minBin) / (maxBin - minBin);
+        const hue = (1 - freqRatio) * 240; // Blue to red (high to low freq)
+        const saturation = 70 + (intensity * 30); // More saturated for higher intensity
+        const lightness = 20 + (intensity * 60); // Brighter for higher intensity
+
+        ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+
+        const y = height - ((binIndex - minBin) * freqPixelHeight);
+        ctx.fillRect(x, y - freqPixelHeight, Math.max(1, timePixelWidth), Math.max(1, freqPixelHeight));
+      }
+    }
+
+    // Add frequency scale overlay (optional)
+    if (width > 200) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.font = '10px monospace';
+      const freqLabels = [1000, 2000, 4000, 8000];
+      
+      freqLabels.forEach(freq => {
+        if (freq <= maxDisplayFreq) {
+          const bin = spectrogramAnalyzer.frequencyToBin(freq, maxFrequency * 2);
+          const y = height - ((bin - minBin) * freqPixelHeight);
+          ctx.fillText(`${freq/1000}k`, 2, y - 2);
+        }
+      });
+    }
   };
 
   return (

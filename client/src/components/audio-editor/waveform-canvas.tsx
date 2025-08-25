@@ -18,6 +18,8 @@ interface WaveformCanvasProps {
   selectionEnd?: number | null;
   selectedTrackId?: string | null;
   onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
+  viewMode?: 'waveform' | 'spectrogram';
+  zoomLevel?: number;
 }
 
 export function WaveformCanvas({
@@ -35,7 +37,9 @@ export function WaveformCanvas({
   selectedTrackId,
   onSelectionChange,
   onMoveClipBetweenTracks,
-  onSaveState
+  onSaveState,
+  viewMode = 'waveform',
+  zoomLevel = 100
 }: WaveformCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggedClip, setDraggedClip] = useState<string | null>(null);
@@ -356,6 +360,8 @@ export function WaveformCanvas({
                     clip={clip}
                     width={clip.duration * pixelsPerSecond}
                     height={88} // h-24 minus padding
+                    showSpectrogram={viewMode === 'spectrogram'}
+                    zoomLevel={zoomLevel}
                   />
                   
                   {/* Fade In Gradient */}

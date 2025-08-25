@@ -120,20 +120,7 @@ export class WaveformRenderer {
         this.ctx.fillRect(x, centerY + peakHeight - 1, 1, 2); // Bottom peak
       }
       
-      // Add frequency-based coloring for high-frequency content
-      if (samplesPerPixel > 1) {
-        let highFreqEnergy = 0;
-        for (let i = 1; i < samplesToAnalyze && sampleIndex + i < channelData.length; i++) {
-          const diff = channelData[sampleIndex + i] - channelData[sampleIndex + i - 1];
-          highFreqEnergy += diff * diff;
-        }
-        
-        if (highFreqEnergy > 0.01) {
-          this.ctx.fillStyle = 'rgba(255, 215, 0, 0.4)'; // Gold for high freq
-          const hfHeight = Math.sqrt(highFreqEnergy) * height * 0.3;
-          this.ctx.fillRect(x, centerY - hfHeight, 1, hfHeight * 2);
-        }
-      }
+      // Clean waveform without pseudo-spectrogram
     }
     
     // Add subtle outline for definition
