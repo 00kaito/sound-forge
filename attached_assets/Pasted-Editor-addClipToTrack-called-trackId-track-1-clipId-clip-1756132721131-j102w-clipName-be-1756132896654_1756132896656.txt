@@ -1,0 +1,57 @@
+Editor: addClipToTrack called {trackId: 'track-1', clipId: 'clip-1756132721131-j102w', clipName: 'bean-lifecycle'}
+editor.tsx:260 Editor: Is first clip? true Total clips: 0
+editor.tsx:263 Editor: Looking for audio file with ID local-1756132716076-elsby7fdt
+editor.tsx:264 Editor: Available audio files: [{…}]
+use-local-audio-storage.tsx:126 LocalAudioStorage: getAudioFile called with ID local-1756132716076-elsby7fdt
+use-local-audio-storage.tsx:127 LocalAudioStorage: Available files: [{…}]
+use-local-audio-storage.tsx:129 LocalAudioStorage: Found file: {id: 'local-1756132716076-elsby7fdt', name: 'bean-lifecycle'}
+editor.tsx:283 Editor: Found audio file {id: 'local-1756132716076-elsby7fdt', name: 'bean-lifecycle'}
+editor.tsx:288 Editor: Loading audio buffer for local storage bean-lifecycle
+use-local-audio-storage.tsx:143 LocalAudioStorage: Loading audio buffer for bean-lifecycle 21.98MB
+use-local-audio-storage.tsx:166 LocalAudioStorage: Audio buffer loaded in 10588ms for bean-lifecycle
+editor.tsx:294 Editor: Loading audio file into engine local-1756132716076-elsby7fdt
+audio-engine.ts:58 Audio Engine: Decoding audio data for local-1756132716076-elsby7fdt
+audio-engine.ts:63 Audio Engine: Audio buffer loaded and stored {id: 'local-1756132716076-elsby7fdt', duration: 5761.128, channels: 1, sampleRate: 48000, totalLoaded: 1}
+editor.tsx:298 Editor: Audio buffer loaded successfully into engine {id: 'local-1756132716076-elsby7fdt', duration: 5761.128, channels: 1}
+editor.tsx:323 Editor: Adding clip to tracks state
+editor.tsx:340 Editor: Auto-fitting after first clip
+editor.tsx:334 Editor: New tracks state (3) [{…}, {…}, {…}]
+waveform-visualization.tsx:35 Spectrogram: No buffer in Audio Engine, trying LocalAudioStorage
+use-local-audio-storage.tsx:126 LocalAudioStorage: getAudioFile called with ID local-1756132716076-elsby7fdt
+use-local-audio-storage.tsx:127 LocalAudioStorage: Available files: []
+use-local-audio-storage.tsx:129 LocalAudioStorage: Found file: NOT FOUND
+waveform-visualization.tsx:41 Spectrogram: No audio buffer found for clip local-1756132716076-elsby7fdt
+waveform-visualization.tsx:42 Spectrogram: Audio Engine buffer: false
+use-local-audio-storage.tsx:126 LocalAudioStorage: getAudioFile called with ID local-1756132716076-elsby7fdt
+use-local-audio-storage.tsx:127 LocalAudioStorage: Available files: []
+use-local-audio-storage.tsx:129 LocalAudioStorage: Found file: NOT FOUND
+waveform-visualization.tsx:43 Spectrogram: LocalStorage buffer: false
+audio-engine.ts:111 Audio Engine: Track volume updated {trackId: 'track-1', volume: 0.75}
+audio-engine.ts:121 Audio Engine: Track pan updated {trackId: 'track-1', pan: 0, actualValue: 0, hasConnections: true}
+audio-engine.ts:111 Audio Engine: Track volume updated {trackId: 'track-2', volume: 0.8}
+audio-engine.ts:121 Audio Engine: Track pan updated {trackId: 'track-2', pan: 0, actualValue: 0, hasConnections: true}
+audio-engine.ts:111 Audio Engine: Track volume updated {trackId: 'track-3', volume: 0.75}
+audio-engine.ts:121 Audio Engine: Track pan updated {trackId: 'track-3', pan: 0, actualValue: 0, hasConnections: true}
+audio-engine.ts:217 Audio Engine: Timeline updated {tracks: 3, clips: 1, loadedBuffers: 1, clipIds: Array(1), loadedBufferIds: Array(1)}
+editor.tsx:175 Audio Engine: Initialized track gains and settings
+editor.tsx:351 Editor: Auto-fit zoom applied: 0.24747102687219505
+waveform-visualization.tsx:35 Spectrogram: No buffer in Audio Engine, trying LocalAudioStorage
+use-local-audio-storage.tsx:126 LocalAudioStorage: getAudioFile called with ID local-1756132716076-elsby7fdt
+use-local-audio-storage.tsx:127 LocalAudioStorage: Available files: []
+use-local-audio-storage.tsx:129 LocalAudioStorage: Found file: NOT FOUND
+waveform-visualization.tsx:41 Spectrogram: No audio buffer found for clip local-1756132716076-elsby7fdt
+waveform-visualization.tsx:42 Spectrogram: Audio Engine buffer: false
+use-local-audio-storage.tsx:126 LocalAudioStorage: getAudioFile called with ID local-1756132716076-elsby7fdt
+use-local-audio-storage.tsx:127 LocalAudioStorage: Available files: []
+use-local-audio-storage.tsx:129 LocalAudioStorage: Found file: NOT FOUND
+waveform-visualization.tsx:43 Spectrogram: LocalStorage buffer: false
+waveform-visualization.tsx:35 Spectrogram: No buffer in Audio Engine, trying LocalAudioStorage
+use-local-audio-storage.tsx:126 LocalAudioStorage: getAudioFile called with ID local-1756132716076-elsby7fdt
+use-local-audio-storage.tsx:127 LocalAudioStorage: Available files: []
+use-local-audio-storage.tsx:129 LocalAudioStorage: Found file: NOT FOUND
+waveform-visualization.tsx:41 Spectrogram: No audio buffer found for clip local-1756132716076-elsby7fdt
+waveform-visualization.tsx:42 Spectrogram: Audio Engine buffer: false
+use-local-audio-storage.tsx:126 LocalAudioStorage: getAudioFile called with ID local-1756132716076-elsby7fdt
+use-local-audio-storage.tsx:127 LocalAudioStorage: Available files: []
+use-local-audio-storage.tsx:129 LocalAudioStorage: Found file: NOT FOUND
+waveform-visualization.tsx:43 Spectrogram: LocalStorage buffer: false

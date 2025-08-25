@@ -20,6 +20,7 @@ export default function AudioEditor() {
     playbackState, 
     error: audioError, 
     loadAudioFile, 
+    getAudioBuffer,
     exportAudio, 
     play, 
     pause, 
@@ -1116,6 +1117,7 @@ export default function AudioEditor() {
           loadingTracks={loadingTracks}
           onImportTranscript={handleImportTranscript}
           onAddEffects={() => setIsEffectsModalOpen(true)}
+          getAudioBuffer={getAudioBuffer}
           data-testid="timeline"
         />
         

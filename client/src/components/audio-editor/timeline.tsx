@@ -31,6 +31,7 @@ interface TimelineProps {
   loadingTracks?: Set<string>;
   onImportTranscript?: () => void;
   onAddEffects?: () => void;
+  getAudioBuffer?: (audioFileId: string) => AudioBuffer | undefined;
 }
 
 export function Timeline({
@@ -57,7 +58,8 @@ export function Timeline({
   onSaveState,
   loadingTracks,
   onImportTranscript,
-  onAddEffects
+  onAddEffects,
+  getAudioBuffer
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
@@ -586,6 +588,7 @@ export function Timeline({
               onSaveState={onSaveState}
               viewMode={viewMode}
               zoomLevel={zoomLevel}
+              getAudioBuffer={getAudioBuffer}
               data-testid="waveform-canvas"
             />
           </div>

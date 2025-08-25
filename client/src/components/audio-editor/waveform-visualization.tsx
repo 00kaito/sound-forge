@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AudioClip } from '@/types/audio';
 import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
-import { useAudioEngine } from '@/hooks/use-audio-engine';
 import { spectrogramAnalyzer, SpectrogramData } from '@/lib/spectrogram-analyzer';
 
 interface WaveformVisualizationProps {
@@ -10,12 +9,12 @@ interface WaveformVisualizationProps {
   height: number;
   showSpectrogram?: boolean;
   zoomLevel?: number;
+  getAudioBuffer?: (audioFileId: string) => AudioBuffer | undefined;
 }
 
-export function WaveformVisualization({ clip, width, height, showSpectrogram = false, zoomLevel }: WaveformVisualizationProps) {
+export function WaveformVisualization({ clip, width, height, showSpectrogram = false, zoomLevel, getAudioBuffer }: WaveformVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { getAudioFile } = useLocalAudioStorage();
-  const { getAudioBuffer } = useAudioEngine();
   const [spectrogramData, setSpectrogramData] = useState<SpectrogramData | null>(null);
 
   useEffect(() => {
@@ -27,19 +26,20 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
   }, [clip.audioFileId, clip.offset, clip.duration, width, height, showSpectrogram, zoomLevel]);
 
   const loadSpectrogramData = async () => {
-    // First try to get buffer from Audio Engine (more reliable)
-    let audioBuffer = getAudioBuffer(clip.audioFileId);
+    // Try to get buffer from passed function (more reliable)
+    let audioBuffer = getAudioBuffer?.(clip.audioFileId);
     
     // Fallback to LocalAudioStorage
     if (!audioBuffer) {
-      console.log('Spectrogram: No buffer in Audio Engine, trying LocalAudioStorage');
+      console.log('Spectrogram: No buffer from getAudioBuffer, trying LocalAudioStorage');
       const audioFile = getAudioFile(clip.audioFileId);
       audioBuffer = audioFile?.audioBuffer;
     }
     
     if (!audioBuffer) {
       console.log('Spectrogram: No audio buffer found for clip', clip.audioFileId);
-      console.log('Spectrogram: Audio Engine buffer:', !!getAudioBuffer(clip.audioFileId));
+      console.log('Spectrogram: getAudioBuffer prop:', !!getAudioBuffer);
+      console.log('Spectrogram: getAudioBuffer result:', !!getAudioBuffer?.(clip.audioFileId));
       console.log('Spectrogram: LocalStorage buffer:', !!getAudioFile(clip.audioFileId)?.audioBuffer);
       return;
     }
@@ -70,8 +70,8 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // First try to get buffer from Audio Engine (more reliable)
-    let audioBuffer = getAudioBuffer(clip.audioFileId);
+    // First try to get buffer from passed function (more reliable)
+    let audioBuffer = getAudioBuffer?.(clip.audioFileId);
     
     // Fallback to LocalAudioStorage
     if (!audioBuffer) {
