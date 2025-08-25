@@ -27,7 +27,7 @@ export function useAudioEngine() {
     }
   }, []);
 
-  const loadAudioFile = useCallback(async (audioFileId: string, file: File | ArrayBuffer) => {
+  const loadAudioFile = useCallback(async (audioFileId: string, file: File | ArrayBuffer | AudioBuffer) => {
     if (!engineRef.current) {
       throw new Error('Audio engine not initialized');
     }

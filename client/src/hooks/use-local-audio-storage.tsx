@@ -6,12 +6,17 @@ export function useLocalAudioStorage() {
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const addAudioFile = useCallback(async (file: File): Promise<LocalAudioFile> => {
-    console.log('LocalAudioStorage: Adding audio file', file.name);
+  const addAudioFile = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<LocalAudioFile> => {
+    const fileSizeMB = Math.round(file.size / 1024 / 1024 * 100) / 100;
+    console.log('LocalAudioStorage: Adding audio file', file.name, `${fileSizeMB}MB`);
     
     try {
+      onProgress?.(10); // Starting duration detection
+      
       // Get duration from audio file with error handling
       const duration = await getAudioDuration(file);
+      
+      onProgress?.(60); // Duration detected
       
       const audioFile: LocalAudioFile = {
         id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -20,6 +25,8 @@ export function useLocalAudioStorage() {
         duration
       };
 
+      onProgress?.(90); // File object created
+      
       console.log('LocalAudioStorage: Created file object', { id: audioFile.id, name: audioFile.name, duration });
       
       setAudioFiles(prev => {
@@ -28,6 +35,8 @@ export function useLocalAudioStorage() {
         console.log('LocalAudioStorage: Files:', newFiles.map(f => ({ id: f.id, name: f.name })));
         return newFiles;
       });
+      
+      onProgress?.(100); // Complete
       
       console.log('LocalAudioStorage: File added successfully');
       return audioFile;
@@ -121,23 +130,43 @@ export function useLocalAudioStorage() {
     return found;
   }, [audioFiles]);
 
-  const loadAudioBuffer = useCallback(async (audioFile: LocalAudioFile): Promise<AudioBuffer> => {
+  const loadAudioBuffer = useCallback(async (audioFile: LocalAudioFile, onProgress?: (progress: number) => void): Promise<AudioBuffer> => {
+    // Return cached buffer if available
     if (audioFile.audioBuffer) {
+      console.log('LocalAudioStorage: Using cached audio buffer for', audioFile.name);
+      onProgress?.(100);
       return audioFile.audioBuffer;
     }
 
+    const startTime = performance.now();
+    const fileSizeMB = Math.round(audioFile.file.size / 1024 / 1024 * 100) / 100;
+    console.log('LocalAudioStorage: Loading audio buffer for', audioFile.name, `${fileSizeMB}MB`);
+
     try {
+      onProgress?.(20); // Starting to read file
+      
+      // Use streaming approach for large files
       const arrayBuffer = await audioFile.file.arrayBuffer();
+      
+      onProgress?.(60); // File read, starting decode
+      
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       
-      // Cache the buffer
+      onProgress?.(90); // Decoded, caching
+      
+      // Cache the buffer for future use
       setAudioFiles(prev => 
         prev.map(file => 
           file.id === audioFile.id ? { ...file, audioBuffer } : file
         )
       );
-
+      
+      const loadTime = Math.round(performance.now() - startTime);
+      console.log(`LocalAudioStorage: Audio buffer loaded in ${loadTime}ms for ${audioFile.name}`);
+      
+      onProgress?.(100); // Complete
+      
       return audioBuffer;
     } catch (error) {
       console.error('Error loading audio buffer for file:', audioFile.name, error);

@@ -292,7 +292,9 @@ export default function AudioEditor() {
       // Load into audio engine for playback - CRITICAL STEP
       if (isInitialized) {
         console.log('Editor: Loading audio file into engine', clip.audioFileId);
-        const buffer = await loadAudioFile(clip.audioFileId, audioFile.file);
+        // Use cached buffer if available to avoid re-decoding
+        const bufferToLoad = audioFile.audioBuffer || audioFile.file;
+        const buffer = await loadAudioFile(clip.audioFileId, bufferToLoad);
         console.log('Editor: Audio buffer loaded successfully into engine', { 
           id: clip.audioFileId, 
           duration: buffer.duration,
@@ -614,7 +616,10 @@ export default function AudioEditor() {
         for (const clip of track.clips) {
           const audioFile = getAudioFile(clip.audioFileId);
           if (audioFile && !audioFile.audioBuffer) {
-            await loadAudioBuffer(audioFile);
+            console.log('Export: Loading audio buffer for', audioFile.name);
+            await loadAudioBuffer(audioFile, (progress) => {
+              console.log(`Loading ${audioFile.name}: ${progress}%`);
+            });
           }
         }
       }
@@ -777,7 +782,9 @@ export default function AudioEditor() {
             if (audioFile && isInitialized) {
               try {
                 console.log('Loading audio file into engine after import:', fileId, audioFile.name);
-                await loadAudioFile(fileId as string, audioFile.file);
+                // Use cached buffer if available to avoid re-decoding
+                const bufferToLoad = audioFile.audioBuffer || audioFile.file;
+                await loadAudioFile(fileId as string, bufferToLoad);
               } catch (error) {
                 console.error('Error loading audio file into engine:', fileId, error);
               }
@@ -912,8 +919,10 @@ export default function AudioEditor() {
         audioContext.close();
       }
       
-      // Add the effect file to audio storage
-      const audioFile = await addAudioFile(effectFile);
+      // Add the effect file to audio storage with progress tracking
+      const audioFile = await addAudioFile(effectFile, (progress) => {
+        console.log(`Adding effect ${effectName}: ${progress}%`);
+      });
       
       // Find the first track to add the effect to
       const targetTrack = tracks[0];

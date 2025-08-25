@@ -3,6 +3,7 @@ import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Track, AudioClip, LocalAudioFile } from '@/types/audio';
@@ -16,7 +17,7 @@ interface SidebarProps {
   currentTool: string;
   onToolChange: (tool: string) => void;
   audioFiles: LocalAudioFile[];
-  addAudioFile: (file: File) => Promise<LocalAudioFile>;
+  addAudioFile: (file: File, onProgress?: (progress: number) => void) => Promise<LocalAudioFile>;
   removeAudioFile: (id: string) => void;
   concatenateFiles: (fileIds: string[], newName: string) => Promise<LocalAudioFile | null>;
 }
@@ -28,6 +29,8 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [concatenateModalOpen, setConcatenateModalOpen] = useState(false);
   const [concatenateName, setConcatenateName] = useState('');
+  const [loadingFile, setLoadingFile] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const { toast } = useToast();
   // Audio storage functions now passed as props
 
@@ -39,7 +42,15 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
     try {
       const promises = Array.from(files).map(async (file) => {
         if (file.type.startsWith('audio/')) {
-          const result = await addAudioFile(file);
+          setLoadingFile(file.name);
+          setLoadingProgress(0);
+          
+          const result = await addAudioFile(file, (progress) => {
+            setLoadingProgress(progress);
+          });
+          
+          setLoadingFile(null);
+          setLoadingProgress(0);
           return result;
         } else {
           toast({
@@ -140,6 +151,19 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
               <span className="text-sm">Processing files...</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Loading Progress */}
+        {loadingFile && (
+          <div className="bg-gray-800 rounded p-3 mb-3">
+            <div className="text-sm text-gray-300 mb-2">
+              📁 Loading: {loadingFile}
+            </div>
+            <Progress value={loadingProgress} className="h-2 bg-gray-700" />
+            <div className="text-xs text-gray-400 mt-1">
+              {loadingProgress}% complete
             </div>
           </div>
         )}

@@ -34,26 +34,37 @@ export class AudioEngine {
     }
   }
 
-  async loadAudioFile(audioFileId: string, file: File | ArrayBuffer): Promise<AudioBuffer> {
+  async loadAudioFile(audioFileId: string, file: File | ArrayBuffer | AudioBuffer): Promise<AudioBuffer> {
     if (!this.audioContext) {
       throw new Error('Audio context not initialized');
     }
 
     try {
-      let arrayBuffer: ArrayBuffer;
+      let audioBuffer: AudioBuffer;
       
-      if (file instanceof File) {
-        arrayBuffer = await file.arrayBuffer();
+      // If already an AudioBuffer, use it directly (avoid re-decoding)
+      if (file instanceof AudioBuffer) {
+        audioBuffer = file;
+        console.log('Audio Engine: Using pre-decoded AudioBuffer for', audioFileId);
       } else {
-        arrayBuffer = file;
+        let arrayBuffer: ArrayBuffer;
+        
+        if (file instanceof File) {
+          arrayBuffer = await file.arrayBuffer();
+        } else {
+          arrayBuffer = file;
+        }
+        
+        console.log('Audio Engine: Decoding audio data for', audioFileId);
+        audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       }
       
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
       this.tracks.set(audioFileId, audioBuffer);
       console.log('Audio Engine: Audio buffer loaded and stored', {
         id: audioFileId,
         duration: audioBuffer.duration,
         channels: audioBuffer.numberOfChannels,
+        sampleRate: audioBuffer.sampleRate,
         totalLoaded: this.tracks.size
       });
       return audioBuffer;
