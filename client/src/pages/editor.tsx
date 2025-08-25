@@ -931,16 +931,18 @@ export default function AudioEditor() {
           data-testid="timeline"
         />
         
-        <TranscriptPanel
-          transcript={transcript?.segments || null}
-          currentTime={playbackState.currentTime}
-          isVisible={isTranscriptVisible}
-          onClose={() => setIsTranscriptVisible(false)}
-          onSeekTo={seekTo}
-          width={transcriptPanelWidth}
-          onWidthChange={setTranscriptPanelWidth}
-        />
       </div>
+      
+      {/* Transcript Panel - Fixed overlay on the right */}
+      <TranscriptPanel
+        transcript={transcript?.segments || null}
+        currentTime={playbackState.currentTime}
+        isVisible={isTranscriptVisible}
+        onClose={() => setIsTranscriptVisible(false)}
+        onSeekTo={seekTo}
+        width={transcriptPanelWidth}
+        onWidthChange={setTranscriptPanelWidth}
+      />
 
       <ExportModal
         isOpen={isExportModalOpen}

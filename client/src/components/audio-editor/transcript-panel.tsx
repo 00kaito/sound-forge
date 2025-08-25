@@ -88,8 +88,12 @@ export function TranscriptPanel({
 
   return (
     <div 
-      className="panel-bg border-l border-gray-700 flex flex-col shadow-lg backdrop-blur-sm relative"
-      style={{ width: `${displayWidth}px`, minWidth: isCollapsed ? '40px' : '250px' }}
+      className="fixed top-0 right-0 h-full panel-bg border-l border-gray-700 flex flex-col shadow-lg backdrop-blur-sm z-30"
+      style={{ 
+        width: `${displayWidth}px`, 
+        minWidth: isCollapsed ? '40px' : '250px',
+        marginTop: '72px' // Account for toolbar height
+      }}
       data-testid="transcript-panel"
     >
       {/* Resize Handle - visible border that extends beyond panel */}
