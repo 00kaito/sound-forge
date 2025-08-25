@@ -913,7 +913,7 @@ export default function AudioEditor() {
       }
       
       // Add the effect file to audio storage
-      const audioFileId = await addAudioFile(effectFile);
+      const audioFile = await addAudioFile(effectFile);
       
       // Find the first track to add the effect to
       const targetTrack = tracks[0];
@@ -927,7 +927,7 @@ export default function AudioEditor() {
       }
 
       // Load the audio buffer for this effect
-      const audioBuffer = await loadAudioBuffer(audioFileId);
+      const audioBuffer = await loadAudioBuffer(audioFile);
       if (!audioBuffer) {
         toast({
           variant: "destructive",
@@ -940,7 +940,7 @@ export default function AudioEditor() {
       // Create a new clip at the current playhead position
       const newClip: AudioClip = {
         id: `effect-${Date.now()}`,
-        audioFileId: audioFileId,
+        audioFileId: audioFile.id,
         startTime: playbackState.currentTime,
         duration: audioBuffer.duration,
         offset: 0,
@@ -961,14 +961,15 @@ export default function AudioEditor() {
       setTracks(newTracks);
 
       // Update timeline data in audio engine
-      setTimelineData(newTracks);
+      const allClips = newTracks.flatMap(track => track.clips);
+      setTimelineData(newTracks, allClips);
 
       toast({
         title: "Effect Added",
         description: `${effectName} added to ${targetTrack.name} at ${formatTime(playbackState.currentTime)}`
       });
 
-      saveState(newTracks, `Add effect: ${effectName}`);
+      saveState(newTracks, `Added effect: ${effectName}`);
     } catch (error) {
       console.error('Error adding effect:', error);
       toast({
