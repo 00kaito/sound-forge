@@ -73,26 +73,6 @@ export function Toolbar({
             <Save className="w-4 h-4 mr-1" />
             Save Project
           </Button>
-          <Button
-            onClick={onImportTranscript}
-            variant="secondary"
-            size="sm"
-            className="bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-600 hover:to-emerald-500 text-white border border-emerald-500/50 hover:border-emerald-400/60 shadow-lg backdrop-blur-sm"
-            data-testid="button-import-transcript"
-          >
-            <FileText className="w-4 h-4 mr-1" />
-            Import Transcript
-          </Button>
-          <Button
-            onClick={onAddEffects}
-            variant="secondary"
-            size="sm"
-            className="bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white border border-purple-500/50 hover:border-purple-400/60 shadow-lg backdrop-blur-sm"
-            data-testid="button-add-effects"
-          >
-            <Volume2 className="w-4 h-4 mr-1" />
-            Add Effects
-          </Button>
         </div>
       </div>
       
