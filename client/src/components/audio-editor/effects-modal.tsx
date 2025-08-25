@@ -141,12 +141,12 @@ export function EffectsModal({ isOpen, onClose, onSelectEffect, currentTime }: E
       
       audio.onended = () => setPlayingId(null);
       audio.onerror = () => {
-        console.error('Error playing sound preview');
+        console.log('Preview not available (mock data)');
         setPlayingId(null);
       };
       
       audio.play().catch(err => {
-        console.error('Error playing audio:', err);
+        console.log('Preview not available (mock data)');
         setPlayingId(null);
       });
       

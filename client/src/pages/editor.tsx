@@ -875,41 +875,41 @@ export default function AudioEditor() {
         const audioBlob = await effectResponse.blob();
         effectFile = new File([audioBlob], `${effectName}.mp3`, { type: 'audio/mp3' });
       } else {
-        // Fallback: create a minimal wav file with silence
-        const sampleRate = 44100;
+        // Create a proper WAV file using Web Audio API
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const sampleRate = audioContext.sampleRate;
         const duration = 3; // 3 seconds
         const length = sampleRate * duration;
-        const arrayBuffer = new ArrayBuffer(44 + length * 2);
-        const view = new DataView(arrayBuffer);
         
-        // WAV header
-        const writeString = (offset: number, string: string) => {
-          for (let i = 0; i < string.length; i++) {
-            view.setUint8(offset + i, string.charCodeAt(i));
-          }
-        };
+        // Create audio buffer
+        const audioBuffer = audioContext.createBuffer(1, length, sampleRate);
+        const channelData = audioBuffer.getChannelData(0);
         
-        writeString(0, 'RIFF');
-        view.setUint32(4, 36 + length * 2, true);
-        writeString(8, 'WAVE');
-        writeString(12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeString(36, 'data');
-        view.setUint32(40, length * 2, true);
-        
-        // Generate simple tone for the effect
+        // Generate a pleasant tone (major chord: 440Hz + 554Hz + 659Hz)
         for (let i = 0; i < length; i++) {
-          const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.1; // Quiet 440Hz tone
-          view.setInt16(44 + i * 2, sample * 32767, true);
+          const time = i / sampleRate;
+          const fundamental = Math.sin(2 * Math.PI * 440 * time) * 0.3;
+          const third = Math.sin(2 * Math.PI * 554.37 * time) * 0.2;
+          const fifth = Math.sin(2 * Math.PI * 659.25 * time) * 0.2;
+          
+          // Add envelope (fade in/out)
+          const fadeTime = 0.1; // 100ms fade
+          let envelope = 1;
+          if (time < fadeTime) {
+            envelope = time / fadeTime;
+          } else if (time > duration - fadeTime) {
+            envelope = (duration - time) / fadeTime;
+          }
+          
+          channelData[i] = (fundamental + third + fifth) * envelope * 0.1;
         }
         
-        effectFile = new File([arrayBuffer], `${effectName}.wav`, { type: 'audio/wav' });
+        // Convert to WAV format
+        const wav = audioBufferToWav(audioBuffer);
+        effectFile = new File([wav], `${effectName}.wav`, { type: 'audio/wav' });
+        
+        // Clean up context
+        audioContext.close();
       }
       
       // Add the effect file to audio storage
@@ -978,6 +978,60 @@ export default function AudioEditor() {
         description: "Failed to add sound effect to timeline."
       });
     }
+  };
+
+  // Helper function to convert AudioBuffer to WAV
+  const audioBufferToWav = (buffer: AudioBuffer): ArrayBuffer => {
+    const length = buffer.length;
+    const numberOfChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const bytesPerSample = 2;
+    const blockAlign = numberOfChannels * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = length * blockAlign;
+    const bufferSize = 44 + dataSize;
+    
+    const arrayBuffer = new ArrayBuffer(bufferSize);
+    const view = new DataView(arrayBuffer);
+    
+    // Helper function to write string
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+    
+    // RIFF header
+    writeString(0, 'RIFF');
+    view.setUint32(4, bufferSize - 8, true);
+    writeString(8, 'WAVE');
+    
+    // fmt chunk
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // PCM format
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true); // bits per sample
+    
+    // data chunk
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+    
+    // Convert float samples to int16
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+      for (let channel = 0; channel < numberOfChannels; channel++) {
+        const sample = buffer.getChannelData(channel)[i];
+        const intSample = Math.max(-32768, Math.min(32767, Math.round(sample * 32767)));
+        view.setInt16(offset, intSample, true);
+        offset += 2;
+      }
+    }
+    
+    return arrayBuffer;
   };
 
   if (!isInitialized) {
