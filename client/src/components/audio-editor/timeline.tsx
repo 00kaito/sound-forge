@@ -584,6 +584,8 @@ export function Timeline({
               onSelectionChange={onSelectionChange}
               onMoveClipBetweenTracks={onMoveClipBetweenTracks}
               onSaveState={onSaveState}
+              viewMode={viewMode}
+              zoomLevel={zoomLevel}
               data-testid="waveform-canvas"
             />
           </div>
