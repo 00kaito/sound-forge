@@ -36,8 +36,13 @@ export function useAudioEngine() {
   }, []);
 
   const getAudioBuffer = useCallback((audioFileId: string) => {
-    if (!engineRef.current) return undefined;
-    return engineRef.current.getAudioBuffer(audioFileId);
+    if (!engineRef.current) {
+      console.log('useAudioEngine: getAudioBuffer called but engine not ready');
+      return undefined;
+    }
+    const buffer = engineRef.current.getAudioBuffer(audioFileId);
+    console.log('useAudioEngine: getAudioBuffer called for', audioFileId, 'result:', !!buffer);
+    return buffer;
   }, []);
 
   const play = useCallback(() => {

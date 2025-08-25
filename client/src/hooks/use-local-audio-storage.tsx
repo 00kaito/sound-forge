@@ -124,9 +124,10 @@ export function useLocalAudioStorage() {
 
   const getAudioFile = useCallback((id: string): LocalAudioFile | undefined => {
     console.log('LocalAudioStorage: getAudioFile called with ID', id);
-    console.log('LocalAudioStorage: Available files:', audioFiles.map(f => ({ id: f.id, name: f.name })));
+    console.log('LocalAudioStorage: Available files:', audioFiles.map(f => ({ id: f.id, name: f.name, hasBuffer: !!f.audioBuffer })));
+    console.log('LocalAudioStorage: Total files in storage:', audioFiles.length);
     const found = audioFiles.find(file => file.id === id);
-    console.log('LocalAudioStorage: Found file:', found ? { id: found.id, name: found.name } : 'NOT FOUND');
+    console.log('LocalAudioStorage: Found file:', found ? { id: found.id, name: found.name, hasBuffer: !!found.audioBuffer } : 'NOT FOUND');
     return found;
   }, [audioFiles]);
 
@@ -156,11 +157,13 @@ export function useLocalAudioStorage() {
       onProgress?.(90); // Decoded, caching
       
       // Cache the buffer for future use
-      setAudioFiles(prev => 
-        prev.map(file => 
+      setAudioFiles(prev => {
+        const updated = prev.map(file => 
           file.id === audioFile.id ? { ...file, audioBuffer } : file
-        )
-      );
+        );
+        console.log('LocalAudioStorage: Cached buffer for', audioFile.name, 'Files after cache:', updated.length);
+        return updated;
+      });
       
       const loadTime = Math.round(performance.now() - startTime);
       console.log(`LocalAudioStorage: Audio buffer loaded in ${loadTime}ms for ${audioFile.name}`);
