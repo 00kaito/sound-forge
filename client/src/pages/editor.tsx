@@ -867,8 +867,53 @@ export default function AudioEditor() {
   // Handler for adding sound effect at current playhead position
   const handleAddEffect = async (effectUrl: string, effectName: string) => {
     try {
-      // For now using mock implementation - later will fetch from Freesound API
-      const mockEffectFile = new File([new ArrayBuffer(1024)], `${effectName}.mp3`, { type: 'audio/mp3' });
+      // Create a mock audio file for the effect (in real implementation, this would be downloaded from Freesound)
+      const effectResponse = await fetch('/mock-audio.mp3').catch(() => null);
+      let effectFile: File;
+      
+      if (effectResponse && effectResponse.ok) {
+        const audioBlob = await effectResponse.blob();
+        effectFile = new File([audioBlob], `${effectName}.mp3`, { type: 'audio/mp3' });
+      } else {
+        // Fallback: create a minimal wav file with silence
+        const sampleRate = 44100;
+        const duration = 3; // 3 seconds
+        const length = sampleRate * duration;
+        const arrayBuffer = new ArrayBuffer(44 + length * 2);
+        const view = new DataView(arrayBuffer);
+        
+        // WAV header
+        const writeString = (offset: number, string: string) => {
+          for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+          }
+        };
+        
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + length * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, length * 2, true);
+        
+        // Generate simple tone for the effect
+        for (let i = 0; i < length; i++) {
+          const sample = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.1; // Quiet 440Hz tone
+          view.setInt16(44 + i * 2, sample * 32767, true);
+        }
+        
+        effectFile = new File([arrayBuffer], `${effectName}.wav`, { type: 'audio/wav' });
+      }
+      
+      // Add the effect file to audio storage
+      const audioFileId = await addAudioFile(effectFile);
       
       // Find the first track to add the effect to
       const targetTrack = tracks[0];
@@ -881,12 +926,23 @@ export default function AudioEditor() {
         return;
       }
 
+      // Load the audio buffer for this effect
+      const audioBuffer = await loadAudioBuffer(audioFileId);
+      if (!audioBuffer) {
+        toast({
+          variant: "destructive",
+          title: "Error Loading Effect",
+          description: "Failed to load audio data for the effect."
+        });
+        return;
+      }
+
       // Create a new clip at the current playhead position
       const newClip: AudioClip = {
         id: `effect-${Date.now()}`,
-        audioFileId: `effect-${Date.now()}`,
+        audioFileId: audioFileId,
         startTime: playbackState.currentTime,
-        duration: 3, // Default 3 seconds for mock effects
+        duration: audioBuffer.duration,
         offset: 0,
         volume: 0.8,
         fadeIn: 0,
@@ -896,18 +952,23 @@ export default function AudioEditor() {
       };
 
       // Update tracks with new effect clip
-      setTracks(prev => prev.map(track => 
+      const newTracks = tracks.map(track => 
         track.id === targetTrack.id 
           ? { ...track, clips: [...track.clips, newClip] }
           : track
-      ));
+      );
+      
+      setTracks(newTracks);
+
+      // Update timeline data in audio engine
+      setTimelineData(newTracks);
 
       toast({
         title: "Effect Added",
         description: `${effectName} added to ${targetTrack.name} at ${formatTime(playbackState.currentTime)}`
       });
 
-      saveState(tracks, `Add effect: ${effectName}`);
+      saveState(newTracks, `Add effect: ${effectName}`);
     } catch (error) {
       console.error('Error adding effect:', error);
       toast({
