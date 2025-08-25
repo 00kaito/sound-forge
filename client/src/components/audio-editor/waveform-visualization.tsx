@@ -26,14 +26,19 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
 
   const loadSpectrogramData = async () => {
     const audioFile = getAudioFile(clip.audioFileId);
-    if (!audioFile?.audioBuffer) return;
+    if (!audioFile?.audioBuffer) {
+      console.log('Spectrogram: No audio buffer found for clip', clip.audioFileId);
+      return;
+    }
 
     try {
+      console.log('Spectrogram: Starting analysis for clip', clip.audioFileId);
       const data = await spectrogramAnalyzer.analyzeAudioBuffer(
         audioFile.audioBuffer, 
         clip.audioFileId,
         zoomLevel
       );
+      console.log('Spectrogram: Analysis complete, frames:', data.frequencies.length);
       setSpectrogramData(data);
       drawSpectrogram(data);
     } catch (error) {
@@ -215,16 +220,28 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
 
   const drawSpectrogram = (data: SpectrogramData) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.log('Spectrogram: No canvas ref');
+      return;
+    }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.log('Spectrogram: No canvas context');
+      return;
+    }
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
+    console.log('Spectrogram: Canvas cleared, size:', width, 'x', height);
 
     const { frequencies, timeStep, frequencyBins, maxFrequency } = data;
-    if (frequencies.length === 0) return;
+    if (frequencies.length === 0) {
+      console.log('Spectrogram: No frequency data');
+      return;
+    }
+
+    console.log('Spectrogram: Drawing', frequencies.length, 'frames, max freq:', maxFrequency);
 
     // Calculate display parameters
     const timeRange = clip.duration;
@@ -232,45 +249,64 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
     const endTimeIndex = Math.min(startTimeIndex + Math.floor(timeRange / timeStep), frequencies.length);
     const visibleFrames = endTimeIndex - startTimeIndex;
 
-    if (visibleFrames <= 0) return;
+    console.log('Spectrogram: Visible frames:', visibleFrames, 'from', startTimeIndex, 'to', endTimeIndex);
+
+    if (visibleFrames <= 0) {
+      console.log('Spectrogram: No visible frames');
+      return;
+    }
 
     // Frequency range (focus on audible range)
     const minDisplayFreq = 0;
     const maxDisplayFreq = Math.min(maxFrequency, 8000); // Focus on 0-8kHz for better visual density
-    const minBin = spectrogramAnalyzer.frequencyToBin(minDisplayFreq, maxFrequency * 2);
-    const maxBin = spectrogramAnalyzer.frequencyToBin(maxDisplayFreq, maxFrequency * 2);
+    const minBin = Math.floor((minDisplayFreq / maxFrequency) * frequencyBins);
+    const maxBin = Math.floor((maxDisplayFreq / maxFrequency) * frequencyBins);
+
+    console.log('Spectrogram: Frequency bins:', minBin, 'to', maxBin, 'of', frequencyBins);
 
     // Draw spectrogram
-    const timePixelWidth = width / visibleFrames;
-    const freqPixelHeight = height / (maxBin - minBin);
+    const timePixelWidth = Math.max(1, width / visibleFrames);
+    const freqPixelHeight = Math.max(1, height / (maxBin - minBin));
+
+    console.log('Spectrogram: Pixel dimensions:', timePixelWidth, 'x', freqPixelHeight);
+
+    // Track if we're actually drawing anything
+    let pixelsDrawn = 0;
 
     for (let timeIndex = 0; timeIndex < visibleFrames; timeIndex++) {
       const frameIndex = startTimeIndex + timeIndex;
       if (frameIndex >= frequencies.length) break;
 
       const frame = frequencies[frameIndex];
-      const x = timeIndex * timePixelWidth;
+      const x = Math.floor(timeIndex * timePixelWidth);
 
       for (let binIndex = minBin; binIndex < maxBin; binIndex++) {
         if (binIndex >= frame.length) break;
 
         // Convert magnitude to color intensity
         const magnitude = frame[binIndex];
-        const normalizedMag = Math.max(0, (magnitude + 100) / 100); // Normalize from dB scale
-        const intensity = Math.min(1, normalizedMag);
+        // Improve normalization - typical audio magnitude ranges
+        const normalizedMag = Math.max(0, Math.min(1, (magnitude + 80) / 80)); // dB to 0-1 range
+        const intensity = Math.pow(normalizedMag, 0.5); // Apply gamma correction for better visibility
 
-        // Create color based on frequency and intensity
-        const freqRatio = (binIndex - minBin) / (maxBin - minBin);
-        const hue = (1 - freqRatio) * 240; // Blue to red (high to low freq)
-        const saturation = 70 + (intensity * 30); // More saturated for higher intensity
-        const lightness = 20 + (intensity * 60); // Brighter for higher intensity
+        if (intensity > 0.05) { // Only draw if there's meaningful signal
+          // Create color based on frequency and intensity
+          const freqRatio = (binIndex - minBin) / (maxBin - minBin);
+          const hue = (1 - freqRatio) * 240; // Blue to red (high to low freq)
+          const saturation = 70 + (intensity * 30); // More saturated for higher intensity
+          const lightness = 20 + (intensity * 60); // Brighter for higher intensity
 
-        ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+          ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 
-        const y = height - ((binIndex - minBin) * freqPixelHeight);
-        ctx.fillRect(x, y - freqPixelHeight, Math.max(1, timePixelWidth), Math.max(1, freqPixelHeight));
+          const y = height - ((binIndex - minBin) * freqPixelHeight);
+          ctx.fillRect(x, y - freqPixelHeight, Math.max(1, timePixelWidth), Math.max(1, freqPixelHeight));
+          
+          pixelsDrawn++;
+        }
       }
     }
+
+    console.log('Spectrogram: Drew', pixelsDrawn, 'pixels');
 
     // Add frequency scale overlay (optional)
     if (width > 200) {
@@ -280,7 +316,7 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
       
       freqLabels.forEach(freq => {
         if (freq <= maxDisplayFreq) {
-          const bin = spectrogramAnalyzer.frequencyToBin(freq, maxFrequency * 2);
+          const bin = Math.floor((freq / maxFrequency) * frequencyBins);
           const y = height - ((bin - minBin) * freqPixelHeight);
           ctx.fillText(`${freq/1000}k`, 2, y - 2);
         }
