@@ -88,11 +88,11 @@ export function TranscriptPanel({
 
   return (
     <div 
-      className="fixed top-0 right-0 h-full panel-bg border-l border-gray-700 flex flex-col shadow-lg backdrop-blur-sm z-30"
+      className="fixed top-0 right-0 h-full panel-bg border-l border-gray-700 flex flex-col shadow-lg backdrop-blur-sm z-20"
       style={{ 
         width: `${displayWidth}px`, 
         minWidth: isCollapsed ? '40px' : '250px',
-        marginTop: '72px' // Account for toolbar height
+        marginTop: '80px' // Account for toolbar height with extra padding
       }}
       data-testid="transcript-panel"
     >
