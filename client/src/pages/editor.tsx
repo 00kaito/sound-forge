@@ -1082,6 +1082,8 @@ export default function AudioEditor() {
           addAudioFile={addAudioFile}
           removeAudioFile={handleRemoveAudioFile}
           concatenateFiles={concatenateFiles}
+          onImportTranscript={handleImportTranscript}
+          onAddEffects={() => setIsEffectsModalOpen(true)}
           data-testid="sidebar"
         />
         

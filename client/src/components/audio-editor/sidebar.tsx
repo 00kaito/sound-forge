@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link2, FileAudio } from 'lucide-react';
+import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link2, FileAudio, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,9 +20,11 @@ interface SidebarProps {
   addAudioFile: (file: File, onProgress?: (progress: number) => void) => Promise<LocalAudioFile>;
   removeAudioFile: (id: string) => void;
   concatenateFiles: (fileIds: string[], newName: string) => Promise<LocalAudioFile | null>;
+  onImportTranscript?: () => void;
+  onAddEffects?: () => void;
 }
 
-export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onToolChange, audioFiles = [], addAudioFile, removeAudioFile, concatenateFiles }: SidebarProps) {
+export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onToolChange, audioFiles = [], addAudioFile, removeAudioFile, concatenateFiles, onImportTranscript, onAddEffects }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -109,7 +111,29 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
   };
 
   const tools = [
-    { id: 'cut', icon: Scissors, label: 'Cut' }
+    { 
+      id: 'cut', 
+      icon: Scissors, 
+      label: 'Cut',
+      gradient: 'from-red-500 to-pink-500 hover:from-red-400 hover:to-pink-400',
+      borderColor: 'border-red-400/60 hover:border-red-300/80'
+    },
+    { 
+      id: 'transcript', 
+      icon: FileText, 
+      label: 'Import Transcript',
+      gradient: 'from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400',
+      borderColor: 'border-emerald-400/60 hover:border-emerald-300/80',
+      onClick: onImportTranscript
+    },
+    { 
+      id: 'effects', 
+      icon: Sparkles, 
+      label: 'Add Effects',
+      gradient: 'from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400',
+      borderColor: 'border-purple-400/60 hover:border-purple-300/80',
+      onClick: onAddEffects
+    }
   ];
 
   return (
@@ -167,6 +191,37 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
             </div>
           </div>
         )}
+        
+        {/* Tools Section */}
+        <div className="mb-4">
+          <h4 className="text-sm font-semibold mb-3 text-gray-300">Tools</h4>
+          <div className="grid grid-cols-1 gap-2">
+            {tools.map((tool) => {
+              const Icon = tool.icon;
+              const handleClick = () => {
+                if (tool.onClick) {
+                  tool.onClick();
+                } else if (tool.id === 'cut') {
+                  onToolChange(tool.id);
+                }
+              };
+              
+              return (
+                <Button
+                  key={tool.id}
+                  onClick={handleClick}
+                  variant="secondary"
+                  size="sm"
+                  className={`w-full bg-gradient-to-r ${tool.gradient} text-white border ${tool.borderColor} shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 active:scale-95`}
+                  data-testid={`button-tool-${tool.id}`}
+                >
+                  <Icon className="w-4 h-4 mr-2" />
+                  {tool.label}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
         
         {/* Merge Files Button */}
         {audioFiles.length > 1 && (
