@@ -88,16 +88,17 @@ export function TranscriptPanel({
 
   return (
     <div 
-      className="panel-bg border-l border-gray-700 flex flex-col shadow-lg backdrop-blur-sm"
-      style={{ width: `${displayWidth}px` }}
+      className="panel-bg border-l border-gray-700 flex flex-col shadow-lg backdrop-blur-sm relative"
+      style={{ width: `${displayWidth}px`, minWidth: isCollapsed ? '40px' : '250px' }}
       data-testid="transcript-panel"
     >
       {/* Resize Handle */}
       {!isCollapsed && (
         <div
-          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/50 transition-colors"
+          className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors z-50 bg-transparent"
           onMouseDown={handleMouseDown}
           data-testid="transcript-resize-handle"
+          style={{ marginLeft: '-4px' }} // Extend outside the panel for easier grabbing
         />
       )}
 
