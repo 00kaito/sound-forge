@@ -39,13 +39,20 @@ export function TranscriptPanel({
     if (activeSegment && activeSegment.id !== activeSegmentId) {
       setActiveSegmentId(activeSegment.id);
       
-      // Auto-scroll to active segment
+      // Auto-scroll to active segment within the transcript panel only
       setTimeout(() => {
         if (activeSegmentRef.current) {
-          activeSegmentRef.current.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-          });
+          const transcriptContainer = activeSegmentRef.current.closest('[data-testid="transcript-content"]');
+          if (transcriptContainer) {
+            const elementTop = activeSegmentRef.current.offsetTop;
+            const containerHeight = transcriptContainer.clientHeight;
+            const scrollTop = elementTop - (containerHeight / 2);
+            
+            transcriptContainer.scrollTo({
+              top: Math.max(0, scrollTop),
+              behavior: 'smooth'
+            });
+          }
         }
       }, 100);
     }
@@ -158,7 +165,7 @@ export function TranscriptPanel({
 
       {/* Content */}
       {!isCollapsed && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" data-testid="transcript-content">
           {!transcript || transcript.length === 0 ? (
             <div className="p-4 text-center text-gray-400">
               <p>No transcript loaded</p>

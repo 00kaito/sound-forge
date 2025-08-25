@@ -872,7 +872,7 @@ export default function AudioEditor() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-editor-bg text-white font-inter overflow-hidden audio-editor">
+    <div className="h-screen flex flex-col bg-editor-bg text-white font-inter overflow-hidden audio-editor fixed inset-0">
       <Toolbar
         playbackState={playbackState}
         formatTime={formatTime}
