@@ -1,4 +1,4 @@
-import { Play, Pause, Square, SkipBack, Download, Settings, FolderOpen, Save, FileText } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, Download, Settings, FolderOpen, Save, FileText, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlaybackState } from '@/types/audio';
 
@@ -13,6 +13,7 @@ interface ToolbarProps {
   onSaveProject?: () => void;
   onOpenProject?: () => void;
   onImportTranscript?: () => void;
+  onAddEffects?: () => void;
 }
 
 export function Toolbar({ 
@@ -25,7 +26,8 @@ export function Toolbar({
   onSeekToStart,
   onSaveProject,
   onOpenProject,
-  onImportTranscript
+  onImportTranscript,
+  onAddEffects
 }: ToolbarProps) {
   const handlePlay = () => {
     if (playbackState.isPlaying) {
@@ -80,6 +82,16 @@ export function Toolbar({
           >
             <FileText className="w-4 h-4 mr-1" />
             Import Transcript
+          </Button>
+          <Button
+            onClick={onAddEffects}
+            variant="secondary"
+            size="sm"
+            className="bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white border border-purple-500/50 hover:border-purple-400/60 shadow-lg backdrop-blur-sm"
+            data-testid="button-add-effects"
+          >
+            <Volume2 className="w-4 h-4 mr-1" />
+            Add Effects
           </Button>
         </div>
       </div>

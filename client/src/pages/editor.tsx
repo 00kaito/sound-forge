@@ -8,6 +8,7 @@ import { Sidebar } from '@/components/audio-editor/sidebar';
 import { Timeline } from '@/components/audio-editor/timeline';
 import { ExportModal } from '@/components/audio-editor/export-modal';
 import { TranscriptPanel } from '@/components/audio-editor/transcript-panel';
+import { EffectsModal } from '@/components/audio-editor/effects-modal';
 import { loadSRTFile } from '@/lib/transcript-parser';
 import { Track, AudioClip, ProjectData, ExportSettings, Transcript, TranscriptSegment } from '@/types/audio';
 import { useToast } from '@/hooks/use-toast';
@@ -84,6 +85,9 @@ export default function AudioEditor() {
   const [transcript, setTranscript] = useState<Transcript | null>(null);
   const [isTranscriptVisible, setIsTranscriptVisible] = useState(false);
   const [transcriptPanelWidth, setTranscriptPanelWidth] = useState(350);
+  
+  // Effects modal state
+  const [isEffectsModalOpen, setIsEffectsModalOpen] = useState(false);
 
   useEffect(() => {
     initialize();
@@ -860,6 +864,60 @@ export default function AudioEditor() {
     document.body.removeChild(input);
   };
 
+  // Handler for adding sound effect at current playhead position
+  const handleAddEffect = async (effectUrl: string, effectName: string) => {
+    try {
+      // For now using mock implementation - later will fetch from Freesound API
+      const mockEffectFile = new File([new ArrayBuffer(1024)], `${effectName}.mp3`, { type: 'audio/mp3' });
+      
+      // Find the first track to add the effect to
+      const targetTrack = tracks[0];
+      if (!targetTrack) {
+        toast({
+          variant: "destructive",
+          title: "No Track Available",
+          description: "Create a track first to add sound effects."
+        });
+        return;
+      }
+
+      // Create a new clip at the current playhead position
+      const newClip: AudioClip = {
+        id: `effect-${Date.now()}`,
+        audioFileId: `effect-${Date.now()}`,
+        startTime: playbackState.currentTime,
+        duration: 3, // Default 3 seconds for mock effects
+        offset: 0,
+        volume: 0.8,
+        fadeIn: 0,
+        fadeOut: 0,
+        trackId: targetTrack.id,
+        name: effectName
+      };
+
+      // Update tracks with new effect clip
+      setTracks(prev => prev.map(track => 
+        track.id === targetTrack.id 
+          ? { ...track, clips: [...track.clips, newClip] }
+          : track
+      ));
+
+      toast({
+        title: "Effect Added",
+        description: `${effectName} added to ${targetTrack.name} at ${formatTime(playbackState.currentTime)}`
+      });
+
+      saveState(tracks, `Add effect: ${effectName}`);
+    } catch (error) {
+      console.error('Error adding effect:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add sound effect to timeline."
+      });
+    }
+  };
+
   if (!isInitialized) {
     return (
       <div className="h-screen flex items-center justify-center bg-editor-bg text-white">
@@ -884,6 +942,7 @@ export default function AudioEditor() {
         onSaveProject={handleSaveProject}
         onOpenProject={handleOpenProject}
         onImportTranscript={handleImportTranscript}
+        onAddEffects={() => setIsEffectsModalOpen(true)}
         data-testid="toolbar"
       />
       
@@ -949,6 +1008,13 @@ export default function AudioEditor() {
         onClose={() => setIsExportModalOpen(false)}
         onExport={handleExport}
         data-testid="export-modal"
+      />
+
+      <EffectsModal
+        isOpen={isEffectsModalOpen}
+        onClose={() => setIsEffectsModalOpen(false)}
+        onSelectEffect={handleAddEffect}
+        currentTime={playbackState.currentTime}
       />
     </div>
   );
