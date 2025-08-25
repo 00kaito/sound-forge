@@ -7,7 +7,9 @@ import { Toolbar } from '@/components/audio-editor/toolbar';
 import { Sidebar } from '@/components/audio-editor/sidebar';
 import { Timeline } from '@/components/audio-editor/timeline';
 import { ExportModal } from '@/components/audio-editor/export-modal';
-import { Track, AudioClip, ProjectData, ExportSettings } from '@/types/audio';
+import { TranscriptPanel } from '@/components/audio-editor/transcript-panel';
+import { loadSRTFile } from '@/lib/transcript-parser';
+import { Track, AudioClip, ProjectData, ExportSettings, Transcript, TranscriptSegment } from '@/types/audio';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AudioEditor() {
@@ -77,6 +79,11 @@ export default function AudioEditor() {
   const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [loadingTracks, setLoadingTracks] = useState<Set<string>>(new Set());
+  
+  // Transcript state
+  const [transcript, setTranscript] = useState<Transcript | null>(null);
+  const [isTranscriptVisible, setIsTranscriptVisible] = useState(false);
+  const [transcriptPanelWidth, setTranscriptPanelWidth] = useState(350);
 
   useEffect(() => {
     initialize();
@@ -817,6 +824,42 @@ export default function AudioEditor() {
     document.body.removeChild(input);
   };
 
+  // Import transcript functionality
+  const handleImportTranscript = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.srt';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        const segments = await loadSRTFile(file);
+        setTranscript({
+          segments,
+          filename: file.name
+        });
+        setIsTranscriptVisible(true);
+        
+        toast({
+          title: "Transcript Imported",
+          description: `Successfully loaded ${segments.length} segments from ${file.name}`
+        });
+      } catch (error) {
+        console.error('Error loading transcript:', error);
+        toast({
+          variant: "destructive",
+          title: "Import Failed",
+          description: "There was an error loading the transcript file. Please check the SRT format."
+        });
+      }
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+  };
+
   if (!isInitialized) {
     return (
       <div className="h-screen flex items-center justify-center bg-editor-bg text-white">
@@ -840,6 +883,7 @@ export default function AudioEditor() {
         onSeekToStart={() => seekTo(0)}
         onSaveProject={handleSaveProject}
         onOpenProject={handleOpenProject}
+        onImportTranscript={handleImportTranscript}
         data-testid="toolbar"
       />
       
@@ -885,6 +929,16 @@ export default function AudioEditor() {
           onSaveState={saveState}
           loadingTracks={loadingTracks}
           data-testid="timeline"
+        />
+        
+        <TranscriptPanel
+          transcript={transcript?.segments || null}
+          currentTime={playbackState.currentTime}
+          isVisible={isTranscriptVisible}
+          onClose={() => setIsTranscriptVisible(false)}
+          onSeekTo={seekTo}
+          width={transcriptPanelWidth}
+          onWidthChange={setTranscriptPanelWidth}
         />
       </div>
 

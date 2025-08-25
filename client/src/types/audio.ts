@@ -49,3 +49,15 @@ export interface PlaybackState {
   totalDuration: number;
   playhead: number;
 }
+
+export interface TranscriptSegment {
+  id: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+}
+
+export interface Transcript {
+  segments: TranscriptSegment[];
+  filename?: string;
+}

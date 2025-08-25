@@ -1,4 +1,4 @@
-import { Play, Pause, Square, SkipBack, Download, Settings, FolderOpen, Save } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, Download, Settings, FolderOpen, Save, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlaybackState } from '@/types/audio';
 
@@ -12,6 +12,7 @@ interface ToolbarProps {
   onSeekToStart?: () => void;
   onSaveProject?: () => void;
   onOpenProject?: () => void;
+  onImportTranscript?: () => void;
 }
 
 export function Toolbar({ 
@@ -23,7 +24,8 @@ export function Toolbar({
   onStop,
   onSeekToStart,
   onSaveProject,
-  onOpenProject
+  onOpenProject,
+  onImportTranscript
 }: ToolbarProps) {
   const handlePlay = () => {
     if (playbackState.isPlaying) {
@@ -68,6 +70,16 @@ export function Toolbar({
           >
             <Save className="w-4 h-4 mr-1" />
             Save Project
+          </Button>
+          <Button
+            onClick={onImportTranscript}
+            variant="secondary"
+            size="sm"
+            className="bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-600 hover:to-emerald-500 text-white border border-emerald-500/50 hover:border-emerald-400/60 shadow-lg backdrop-blur-sm"
+            data-testid="button-import-transcript"
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            Import Transcript
           </Button>
         </div>
       </div>
