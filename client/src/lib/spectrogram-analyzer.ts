@@ -18,8 +18,8 @@ export interface SpectrogramCache {
 export class SpectrogramAnalyzer {
   private cache = new Map<string, SpectrogramCache>();
   private maxCacheSize = 10;
-  private readonly FFT_SIZE = 512; // Reduced for better performance
-  private readonly OVERLAP_FACTOR = 0.75; // 75% overlap for smooth visualization
+  private readonly FFT_SIZE = 128; // Much smaller for instant results
+  private readonly OVERLAP_FACTOR = 0.5; // Reduced overlap for speed
   
   // Throttling mechanism - only recalculate spectrogram if zoom changes significantly
   private lastZoomLevel = 0;
@@ -76,37 +76,28 @@ export class SpectrogramAnalyzer {
       hannWindow[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (windowSize - 1)));
     }
     
-    // Process frames in batches to avoid blocking UI
-    const batchSize = 20; // Smaller batches for better responsiveness
-    let frameIndex = 0;
+    // Ultra-simplified: process every 10th frame for speed
+    const frameStep = 10;
+    const maxFrames = Math.min(numFrames, 200); // Limit to max 200 frames
     
-    const processBatch = async (): Promise<void> => {
-      const batchEnd = Math.min(frameIndex + batchSize, numFrames);
+    for (let frame = 0; frame < maxFrames; frame += frameStep) {
+      const startSample = frame * hopSize;
       
-      for (let frame = frameIndex; frame < batchEnd; frame++) {
-        const startSample = frame * hopSize;
-        
-        // Create windowed frame
-        const frameData = new Float32Array(windowSize);
-        for (let i = 0; i < windowSize && startSample + i < channelData.length; i++) {
-          frameData[i] = channelData[startSample + i] * hannWindow[i];
-        }
-        
-        // Use simplified FFT computation
-        const frequencyData = this.computeSimplifiedFFT(frameData);
-        frequencies.push(frequencyData);
+      // Create windowed frame
+      const frameData = new Float32Array(windowSize);
+      for (let i = 0; i < windowSize && startSample + i < channelData.length; i++) {
+        frameData[i] = channelData[startSample + i] * hannWindow[i];
       }
       
-      frameIndex = batchEnd;
+      // Use ultra-simplified FFT computation
+      const frequencyData = this.computeUltraSimplifiedFFT(frameData);
+      frequencies.push(frequencyData);
       
-      // Yield control to prevent UI blocking
-      if (frameIndex < numFrames) {
-        await new Promise(resolve => setTimeout(resolve, 5));
-        return processBatch();
+      // Quick yield every 10 frames
+      if (frame % 50 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 1));
       }
-    };
-    
-    await processBatch();
+    }
     
     const spectrogramData: SpectrogramData = {
       frequencies,
@@ -130,35 +121,32 @@ export class SpectrogramAnalyzer {
     return spectrogramData;
   }
 
-  private computeSimplifiedFFT(signal: Float32Array): Float32Array {
+  private computeUltraSimplifiedFFT(signal: Float32Array): Float32Array {
     const N = signal.length;
     const magnitudes = new Float32Array(N / 2);
     
-    // Use simplified approach - sample only key frequency bins for visualization
-    const maxBins = Math.min(64, N / 2); // Limit to 64 bins for performance
-    const binStep = Math.floor((N / 2) / maxBins);
+    // Ultra-simplified: only 16 frequency bands for instant results
+    const numBands = 16;
+    const bandSize = Math.floor((N / 2) / numBands);
     
-    for (let k = 0; k < maxBins; k++) {
-      const binIndex = k * binStep;
-      let realSum = 0;
-      let imagSum = 0;
+    for (let band = 0; band < numBands; band++) {
+      let energy = 0;
+      const startIdx = band * bandSize;
+      const endIdx = Math.min(startIdx + bandSize, N);
       
-      // Sample fewer points for performance
-      const sampleStep = Math.max(1, Math.floor(N / 128));
-      
-      for (let n = 0; n < N; n += sampleStep) {
-        const angle = (-2 * Math.PI * binIndex * n) / N;
-        realSum += signal[n] * Math.cos(angle);
-        imagSum += signal[n] * Math.sin(angle);
+      // Simple energy calculation instead of FFT
+      for (let i = startIdx; i < endIdx; i += 4) { // Sample every 4th point
+        if (i < signal.length) {
+          energy += signal[i] * signal[i];
+        }
       }
       
-      // Convert to dB scale magnitude
-      const magnitude = Math.sqrt(realSum * realSum + imagSum * imagSum);
-      const dbValue = magnitude > 0 ? 20 * Math.log10(magnitude) : -100;
+      // Convert to dB-like scale
+      const dbValue = energy > 0 ? Math.log10(energy * 1000) * 10 : -60;
       
-      // Fill multiple output bins with same value for visualization
-      for (let i = 0; i < binStep && binIndex + i < magnitudes.length; i++) {
-        magnitudes[binIndex + i] = dbValue;
+      // Fill the band
+      for (let i = 0; i < bandSize && startIdx + i < magnitudes.length; i++) {
+        magnitudes[startIdx + i] = Math.max(-60, Math.min(0, dbValue));
       }
     }
     

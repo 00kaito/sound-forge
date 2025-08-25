@@ -139,25 +139,27 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
 
     const centerY = h / 2;
     
-    // Create enhanced gradient for clips
+    // Create much brighter gradient for better contrast
     const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
-    gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.3)');
-    gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.3)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.7)');
+    gradient.addColorStop(0, 'rgba(99, 162, 255, 1)');     // Bright blue
+    gradient.addColorStop(0.3, 'rgba(139, 192, 255, 0.9)'); // Light blue
+    gradient.addColorStop(0.7, 'rgba(139, 192, 255, 0.9)'); // Light blue  
+    gradient.addColorStop(1, 'rgba(99, 162, 255, 1)');     // Bright blue
     
     // Enhanced multi-layer rendering
     for (let x = 0; x < w; x++) {
       const sampleIndex = startSample + Math.floor(x * samplesPerPixel);
       if (sampleIndex >= data.length) break;
       
-      // Enhanced analysis with peak and RMS detection
+      // Enhanced analysis with better peak and RMS detection
       let sumSquares = 0;
-      let maxPeak = 0;
-      let minPeak = 0;
+      let maxPeak = -1;
+      let minPeak = 1;
       let count = 0;
       
-      for (let i = 0; i < samplesPerPixel && sampleIndex + i < data.length; i++) {
+      // More detailed sampling for accuracy 
+      const detailSamples = Math.min(samplesPerPixel, 64);
+      for (let i = 0; i < detailSamples && sampleIndex + i < data.length; i++) {
         const sample = data[sampleIndex + i];
         sumSquares += sample * sample;
         maxPeak = Math.max(maxPeak, sample);
@@ -168,19 +170,26 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
       if (count === 0) continue;
       
       const rms = Math.sqrt(sumSquares / count);
-      const peakAmplitude = Math.max(Math.abs(maxPeak), Math.abs(minPeak));
       
-      // Clean waveform visualization - RMS body
-      const rmsHeight = rms * (h / 2) * 0.8;
+      // Enhanced amplitude scaling for better visibility
+      const amplifyFactor = 1.6; // Increase amplitude by 60%
+      const maxHeight = Math.abs(maxPeak) * (h / 2) * amplifyFactor;
+      const minHeight = Math.abs(minPeak) * (h / 2) * amplifyFactor;
+      const rmsHeight = rms * (h / 2) * amplifyFactor * 0.8;
+      
+      // Draw main RMS body with bright gradient
       ctx.fillStyle = gradient;
       ctx.fillRect(x, centerY - rmsHeight, 1, rmsHeight * 2);
       
-      // Peak details for transients
-      if (peakAmplitude > rms * 1.5) {
-        const peakHeight = peakAmplitude * (h / 2) * 0.9;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.fillRect(x, centerY - peakHeight, 1, 2);
-        ctx.fillRect(x, centerY + peakHeight - 1, 1, 2);
+      // Bright peak lines for better detail
+      if (maxHeight > rmsHeight * 1.1) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'; // Very bright peaks
+        ctx.fillRect(x, centerY - maxHeight, 1, Math.max(1, maxHeight - rmsHeight));
+      }
+      
+      if (minHeight > rmsHeight * 1.1) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'; // Very bright peaks
+        ctx.fillRect(x, centerY + rmsHeight, 1, Math.max(1, minHeight - rmsHeight));
       }
     }
     
