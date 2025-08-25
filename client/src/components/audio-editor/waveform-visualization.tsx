@@ -1,64 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { AudioClip } from '@/types/audio';
 import { useLocalAudioStorage } from '@/hooks/use-local-audio-storage';
-import { spectrogramAnalyzer, SpectrogramData } from '@/lib/spectrogram-analyzer';
 
 interface WaveformVisualizationProps {
   clip: AudioClip;
   width: number;
   height: number;
-  showSpectrogram?: boolean;
   zoomLevel?: number;
   getAudioBuffer?: (audioFileId: string) => AudioBuffer | undefined;
 }
 
-export function WaveformVisualization({ clip, width, height, showSpectrogram = false, zoomLevel, getAudioBuffer }: WaveformVisualizationProps) {
+export function WaveformVisualization({ clip, width, height, zoomLevel, getAudioBuffer }: WaveformVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { getAudioFile } = useLocalAudioStorage();
-  const [spectrogramData, setSpectrogramData] = useState<SpectrogramData | null>(null);
 
   useEffect(() => {
-    if (showSpectrogram) {
-      loadSpectrogramData();
-    } else {
-      drawWaveform();
-    }
-  }, [clip.audioFileId, clip.offset, clip.duration, width, height, showSpectrogram, zoomLevel]);
-
-  const loadSpectrogramData = async () => {
-    // Try to get buffer from passed function (more reliable)
-    let audioBuffer = getAudioBuffer?.(clip.audioFileId);
-    
-    // Fallback to LocalAudioStorage
-    if (!audioBuffer) {
-      console.log('Spectrogram: No buffer from getAudioBuffer, trying LocalAudioStorage');
-      const audioFile = getAudioFile(clip.audioFileId);
-      audioBuffer = audioFile?.audioBuffer;
-    }
-    
-    if (!audioBuffer) {
-      console.log('Spectrogram: No audio buffer found for clip', clip.audioFileId);
-      console.log('Spectrogram: getAudioBuffer prop:', !!getAudioBuffer);
-      console.log('Spectrogram: getAudioBuffer result:', !!getAudioBuffer?.(clip.audioFileId));
-      console.log('Spectrogram: LocalStorage buffer:', !!getAudioFile(clip.audioFileId)?.audioBuffer);
-      return;
-    }
-
-    try {
-      console.log('Spectrogram: Starting analysis for clip', clip.audioFileId);
-      const data = await spectrogramAnalyzer.analyzeAudioBuffer(
-        audioBuffer, 
-        clip.audioFileId,
-        zoomLevel
-      );
-      console.log('Spectrogram: Analysis complete, frames:', data.frequencies.length);
-      setSpectrogramData(data);
-      drawSpectrogram(data);
-    } catch (error) {
-      console.error('Failed to load spectrogram data:', error);
-      drawWaveform(); // Fallback to waveform
-    }
-  };
+    drawWaveform();
+  }, [clip.audioFileId, clip.offset, clip.duration, width, height, zoomLevel]);
 
   const drawWaveform = () => {
     const canvas = canvasRef.current;
@@ -78,9 +36,9 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
       const audioFile = getAudioFile(clip.audioFileId);
       audioBuffer = audioFile?.audioBuffer;
     }
-    
+
     if (!audioBuffer) {
-      // Draw placeholder waveform
+      // Show placeholder waveform when no buffer available
       drawPlaceholderWaveform(ctx, width, height);
       return;
     }
@@ -248,119 +206,18 @@ export function WaveformVisualization({ clip, width, height, showSpectrogram = f
     ctx.stroke();
   };
 
-  const drawSpectrogram = (data: SpectrogramData) => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      console.log('Spectrogram: No canvas ref');
-      return;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      console.log('Spectrogram: No canvas context');
-      return;
-    }
-
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-    console.log('Spectrogram: Canvas cleared, size:', width, 'x', height);
-
-    const { frequencies, timeStep, frequencyBins, maxFrequency } = data;
-    if (frequencies.length === 0) {
-      console.log('Spectrogram: No frequency data');
-      return;
-    }
-
-    console.log('Spectrogram: Drawing', frequencies.length, 'frames, max freq:', maxFrequency);
-
-    // Calculate display parameters
-    const timeRange = clip.duration;
-    const startTimeIndex = Math.floor(clip.offset / timeStep);
-    const endTimeIndex = Math.min(startTimeIndex + Math.floor(timeRange / timeStep), frequencies.length);
-    const visibleFrames = endTimeIndex - startTimeIndex;
-
-    console.log('Spectrogram: Visible frames:', visibleFrames, 'from', startTimeIndex, 'to', endTimeIndex);
-
-    if (visibleFrames <= 0) {
-      console.log('Spectrogram: No visible frames');
-      return;
-    }
-
-    // Frequency range (focus on audible range)
-    const minDisplayFreq = 0;
-    const maxDisplayFreq = Math.min(maxFrequency, 8000); // Focus on 0-8kHz for better visual density
-    const minBin = Math.floor((minDisplayFreq / maxFrequency) * frequencyBins);
-    const maxBin = Math.floor((maxDisplayFreq / maxFrequency) * frequencyBins);
-
-    console.log('Spectrogram: Frequency bins:', minBin, 'to', maxBin, 'of', frequencyBins);
-
-    // Draw spectrogram
-    const timePixelWidth = Math.max(1, width / visibleFrames);
-    const freqPixelHeight = Math.max(1, height / (maxBin - minBin));
-
-    console.log('Spectrogram: Pixel dimensions:', timePixelWidth, 'x', freqPixelHeight);
-
-    // Track if we're actually drawing anything
-    let pixelsDrawn = 0;
-
-    for (let timeIndex = 0; timeIndex < visibleFrames; timeIndex++) {
-      const frameIndex = startTimeIndex + timeIndex;
-      if (frameIndex >= frequencies.length) break;
-
-      const frame = frequencies[frameIndex];
-      const x = Math.floor(timeIndex * timePixelWidth);
-
-      for (let binIndex = minBin; binIndex < maxBin; binIndex++) {
-        if (binIndex >= frame.length) break;
-
-        // Convert magnitude to color intensity
-        const magnitude = frame[binIndex];
-        // Improve normalization - typical audio magnitude ranges
-        const normalizedMag = Math.max(0, Math.min(1, (magnitude + 80) / 80)); // dB to 0-1 range
-        const intensity = Math.pow(normalizedMag, 0.5); // Apply gamma correction for better visibility
-
-        if (intensity > 0.05) { // Only draw if there's meaningful signal
-          // Create color based on frequency and intensity
-          const freqRatio = (binIndex - minBin) / (maxBin - minBin);
-          const hue = (1 - freqRatio) * 240; // Blue to red (high to low freq)
-          const saturation = 70 + (intensity * 30); // More saturated for higher intensity
-          const lightness = 20 + (intensity * 60); // Brighter for higher intensity
-
-          ctx.fillStyle = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-
-          const y = height - ((binIndex - minBin) * freqPixelHeight);
-          ctx.fillRect(x, y - freqPixelHeight, Math.max(1, timePixelWidth), Math.max(1, freqPixelHeight));
-          
-          pixelsDrawn++;
-        }
-      }
-    }
-
-    console.log('Spectrogram: Drew', pixelsDrawn, 'pixels');
-
-    // Add frequency scale overlay (optional)
-    if (width > 200) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.font = '10px monospace';
-      const freqLabels = [1000, 2000, 4000, 8000];
-      
-      freqLabels.forEach(freq => {
-        if (freq <= maxDisplayFreq) {
-          const bin = Math.floor((freq / maxFrequency) * frequencyBins);
-          const y = height - ((bin - minBin) * freqPixelHeight);
-          ctx.fillText(`${freq/1000}k`, 2, y - 2);
-        }
-      });
-    }
-  };
-
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      className="absolute inset-0 opacity-40"
-      style={{ width: `${width}px`, height: `${height}px` }}
-    />
+    <div style={{ width, height, position: 'relative' }}>
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'block'
+        }}
+      />
+    </div>
   );
 }

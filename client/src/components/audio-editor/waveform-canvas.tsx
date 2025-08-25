@@ -18,7 +18,6 @@ interface WaveformCanvasProps {
   selectionEnd?: number | null;
   selectedTrackId?: string | null;
   onSelectionChange?: (start: number | null, end: number | null, trackId: string | null) => void;
-  viewMode?: 'waveform' | 'spectrogram';
   zoomLevel?: number;
   getAudioBuffer?: (audioFileId: string) => AudioBuffer | undefined;
 }
@@ -39,7 +38,6 @@ export function WaveformCanvas({
   onSelectionChange,
   onMoveClipBetweenTracks,
   onSaveState,
-  viewMode = 'waveform',
   zoomLevel = 100,
   getAudioBuffer
 }: WaveformCanvasProps) {
@@ -362,7 +360,6 @@ export function WaveformCanvas({
                     clip={clip}
                     width={clip.duration * pixelsPerSecond}
                     height={88} // h-24 minus padding
-                    showSpectrogram={viewMode === 'spectrogram'}
                     zoomLevel={zoomLevel}
                     getAudioBuffer={getAudioBuffer}
                   />

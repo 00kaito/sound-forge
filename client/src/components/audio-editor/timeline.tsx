@@ -3,7 +3,6 @@ import { Plus, Minus, Maximize2, Scissors, FileText, Sparkles } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { TrackHeader } from '@/components/audio-editor/track-header';
 import { WaveformCanvas } from '@/components/audio-editor/waveform-canvas';
-import { ViewModeToggle } from '@/components/audio-editor/view-mode-toggle';
 import { Track, PlaybackState, ProjectData, AudioClip } from '@/types/audio';
 
 interface TimelineProps {
@@ -82,8 +81,6 @@ export function Timeline({
   const [dragStartX, setDragStartX] = useState(0);
   const [initialZoom, setInitialZoom] = useState(0);
   
-  // View mode state for waveform/spectrogram toggle
-  const [viewMode, setViewMode] = useState<'waveform' | 'spectrogram'>('waveform');
 
   const updateZoom = (newZoom: number) => {
     const clampedZoom = Math.min(Math.max(newZoom, 0.01), 1500);
@@ -415,11 +412,6 @@ export function Timeline({
             </Button>
           </div>
 
-          {/* View Mode Toggle */}
-          <ViewModeToggle
-            mode={viewMode}
-            onModeChange={setViewMode}
-          />
 
           {/* Tools */}
           <div className="flex items-center space-x-2 border-l border-gray-600 pl-4">
@@ -586,7 +578,6 @@ export function Timeline({
               onSelectionChange={onSelectionChange}
               onMoveClipBetweenTracks={onMoveClipBetweenTracks}
               onSaveState={onSaveState}
-              viewMode={viewMode}
               zoomLevel={zoomLevel}
               getAudioBuffer={getAudioBuffer}
               data-testid="waveform-canvas"
