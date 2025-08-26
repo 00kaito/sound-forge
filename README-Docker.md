@@ -1,16 +1,16 @@
 # AudioForge Docker Deployment
 
-## Database Configuration
+## Storage Architecture
 
-**UWAGA**: Aplikacja AudioForge została zaprojektowana dla **Neon Database** (serverless PostgreSQL), ale Docker setup używa **lokalnego PostgreSQL** dla łatwości deployment.
+**UWAGA**: Aplikacja AudioForge **nie wymaga bazy danych**! Używa uproszczonej architektury storage:
 
-### Różnice między środowiskami:
+### Storage w różnych warstwach:
 
-| Środowisko | Baza danych | Konfiguracja |
-|------------|-------------|--------------|
-| **Development (Replit)** | Neon Database | `DATABASE_URL` z Neon connection string |
-| **Docker (lokalne)** | PostgreSQL 15 | `DATABASE_URL` z lokalnym PostgreSQL |
-| **Production (cloud)** | Neon Database | `DATABASE_URL` z Neon connection string |
+| Warstwa | Storage | Persistence |
+|---------|---------|-------------|
+| **Backend** | MemStorage (RAM) | Nie - resetuje się przy restarcie |
+| **Frontend** | LocalAudioStorage (browser) | Tak - localStorage/IndexedDB |
+| **Pliki** | Volume-mounted uploads | Tak - Docker volume |
 
 ## Uruchamianie z Docker
 
@@ -25,7 +25,7 @@
 ./docker-run.sh status
 ```
 
-## Konfiguracja dla produkcji
+## Konfiguracja
 
 1. **Skopiuj template konfiguracji:**
    ```bash
@@ -34,46 +34,37 @@
 
 2. **Zaktualizuj .env.production:**
    ```bash
-   # Zmień na swój Neon Database connection string
-   DATABASE_URL=postgresql://user:password@host.neon.tech/database?sslmode=require
-   
    # Ustaw bezpieczny session secret
    SESSION_SECRET=twoj-bardzo-bezpieczny-klucz-minimum-32-znaki
    ```
 
-3. **Restart serwisów:**
+3. **Restart serwisu:**
    ```bash
    ./docker-run.sh restart
    ```
 
-## Migracja danych
+## Persistence i Storage
 
-Aplikacja używa Drizzle ORM z automatyczną migracją schema. Schema zostało poprawione dla kompatybilności PostgreSQL:
-
-- ✅ `datetime('now')` → `now()` (PostgreSQL syntax)
-- ✅ UUID generation z `gen_random_uuid()`
-- ✅ Kompatybilność z Neon Database i standardowym PostgreSQL
+- ✅ **Pliki audio**: Volume `audio_uploads` - persistent storage
+- ✅ **Projekty/timeline**: Browser localStorage - persistent w przeglądarce
+- ⚠️ **Backend state**: MemStorage - resetuje się przy restarcie
 
 ## Porty i serwisy
 
 - **AudioForge App**: http://localhost:5000
-- **PostgreSQL**: localhost:5432
-- **Volumes**: 
-  - `audio_uploads` - pliki audio
-  - `postgres_data` - dane bazy
+- **Volume**: `audio_uploads` - uploaded files
 
 ## Troubleshooting
 
-### Problem z migracją bazy
+### Reset storage
 ```bash
-# Usuń volumes i restart
+# Usuń volume z plikami i restart
 docker-compose down -v
 ./docker-run.sh start
 ```
 
-### Problem z portami
+### Problem z portem
 ```bash
-# Sprawdź czy porty są wolne
+# Sprawdź czy port jest wolny
 netstat -tulpn | grep :5000
-netstat -tulpn | grep :5432
 ```
