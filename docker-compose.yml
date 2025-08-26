@@ -34,11 +34,18 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5000
+      # Use local PostgreSQL instead of Neon Database for Docker deployment
       DATABASE_URL: postgresql://audioforge:audioforge_password@postgres:5432/audioforge
       SESSION_SECRET: your-super-secret-session-key-change-in-production
       # Audio processing settings
       MAX_FILE_SIZE: 100MB
       UPLOAD_DIR: /app/uploads
+      # Disable Neon-specific features in Docker
+      PGUSER: audioforge
+      PGPASSWORD: audioforge_password
+      PGDATABASE: audioforge
+      PGHOST: postgres
+      PGPORT: 5432
     volumes:
       # Persistent storage for uploaded audio files
       - audio_uploads:/app/uploads

@@ -17,8 +17,8 @@ export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   data: json("data").notNull(), // Contains tracks, clips, settings etc.
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").default(sql`(datetime('now'))`),
+  createdAt: text("created_at").default(sql`(now())`),
+  updatedAt: text("updated_at").default(sql`(now())`),
 });
 
 export const insertAudioFileSchema = createInsertSchema(audioFiles).pick({

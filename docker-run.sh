@@ -46,6 +46,8 @@ start_services() {
     if [ ! -f .env.production ]; then
         echo "📄 Creating .env.production from .env.docker template..."
         cp .env.docker .env.production
+        echo "⚠️  IMPORTANT: This Docker setup uses local PostgreSQL, not Neon Database!"
+        echo "⚠️  For cloud deployment, update DATABASE_URL in .env.production with your Neon connection string!"
         echo "⚠️  Please edit .env.production and set proper values, especially SESSION_SECRET!"
     fi
     
