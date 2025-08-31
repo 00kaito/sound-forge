@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link2, FileAudio, FileText, Sparkles } from 'lucide-react';
+import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link2, FileAudio, FileText, Sparkles, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,9 +22,12 @@ interface SidebarProps {
   concatenateFiles: (fileIds: string[], newName: string) => Promise<LocalAudioFile | null>;
   onImportTranscript?: () => void;
   onAddEffects?: () => void;
+  onTTSImport?: () => void;
+  isTTSGenerating?: boolean;
+  ttsProgress?: { completed: number; total: number };
 }
 
-export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onToolChange, audioFiles = [], addAudioFile, removeAudioFile, concatenateFiles, onImportTranscript, onAddEffects }: SidebarProps) {
+export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onToolChange, audioFiles = [], addAudioFile, removeAudioFile, concatenateFiles, onImportTranscript, onAddEffects, onTTSImport, isTTSGenerating = false, ttsProgress = { completed: 0, total: 0 } }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -133,6 +136,15 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
       gradient: 'from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400',
       borderColor: 'border-purple-400/60 hover:border-purple-300/80',
       onClick: onAddEffects
+    },
+    { 
+      id: 'tts', 
+      icon: Mic, 
+      label: isTTSGenerating ? `Generating ${ttsProgress.completed}/${ttsProgress.total}` : 'TTS Import',
+      gradient: 'from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400',
+      borderColor: 'border-orange-400/60 hover:border-orange-300/80',
+      onClick: onTTSImport,
+      disabled: isTTSGenerating
     }
   ];
 

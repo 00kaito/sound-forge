@@ -9,8 +9,10 @@ import { Timeline } from '@/components/audio-editor/timeline';
 import { ExportModal } from '@/components/audio-editor/export-modal';
 import { TranscriptPanel } from '@/components/audio-editor/transcript-panel';
 import { EffectsModal } from '@/components/audio-editor/effects-modal';
+import { TTSImportDialog } from '@/components/audio-editor/tts-import-dialog';
 import { loadSRTFile } from '@/lib/transcript-parser';
-import { Track, AudioClip, ProjectData, ExportSettings, Transcript, TranscriptSegment } from '@/types/audio';
+import { TTSService } from '@/lib/tts-service';
+import { Track, AudioClip, ProjectData, ExportSettings, Transcript, TranscriptSegment, TTSVoice, TTSTextFragment, TTSGenerationResult } from '@/types/audio';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AudioEditor() {
@@ -89,6 +91,11 @@ export default function AudioEditor() {
   
   // Effects modal state
   const [isEffectsModalOpen, setIsEffectsModalOpen] = useState(false);
+  
+  // TTS modal state
+  const [isTTSModalOpen, setIsTTSModalOpen] = useState(false);
+  const [isTTSGenerating, setIsTTSGenerating] = useState(false);
+  const [ttsProgress, setTTSProgress] = useState({ completed: 0, total: 0 });
 
   useEffect(() => {
     initialize();
@@ -872,6 +879,142 @@ export default function AudioEditor() {
     document.body.removeChild(input);
   };
 
+  // TTS Generation functionality
+  const handleTTSImport = async (fragments: TTSTextFragment[], voices: TTSVoice[]) => {
+    setIsTTSGenerating(true);
+    setTTSProgress({ completed: 0, total: fragments.length });
+    
+    try {
+      // Generate audio for all fragments
+      const results = await TTSService.generateAudioForFragments(
+        fragments,
+        voices,
+        (completed, total) => {
+          setTTSProgress({ completed, total });
+        }
+      );
+      
+      if (!isInitialized) {
+        await initialize();
+      }
+      
+      // Group fragments by voice to organize into tracks
+      const fragmentsByVoice = TTSService.groupFragmentsByVoice(fragments);
+      const voiceTrackMap = new Map<string, string>();
+      let currentTime = 0;
+      
+      // Find or create tracks for each voice
+      const updatedTracks = [...tracks];
+      
+      for (const voiceId of Array.from(fragmentsByVoice.keys())) {
+        const voiceFragments = fragmentsByVoice.get(voiceId)!;
+        const voice = voices.find(v => v.id === voiceId);
+        if (!voice) continue;
+        
+        // Find an empty track or create a new one
+        let targetTrack = updatedTracks.find(track => track.clips.length === 0);
+        
+        if (!targetTrack) {
+          const newTrackId = `track-${Date.now()}-${voiceId}`;
+          targetTrack = {
+            id: newTrackId,
+            name: `${voice.name} Track`,
+            volume: 0.8,
+            pan: 0,
+            muted: false,
+            solo: false,
+            clips: []
+          };
+          updatedTracks.push(targetTrack);
+          
+          // Create track gain for new track
+          createTrackGain(newTrackId);
+        } else {
+          // Rename existing track
+          targetTrack.name = `${voice.name} Track`;
+        }
+        
+        voiceTrackMap.set(voiceId, targetTrack.id);
+      }
+      
+      // Process each generated audio result
+      currentTime = 0;
+      const newClips: AudioClip[] = [];
+      
+      for (let i = 0; i < fragments.length; i++) {
+        const fragment = fragments[i];
+        const result = results.find(r => r.fragmentId === fragment.id);
+        
+        if (!result) continue;
+        
+        // Convert blob to audio file and add to storage
+        const audioFile = new File([result.audioBlob], `tts-${fragment.id}.mp3`, { type: 'audio/mp3' });
+        const localAudioFile = await addAudioFile(audioFile);
+        
+        // Load audio buffer
+        const audioBuffer = await loadAudioBuffer(localAudioFile);
+        if (!audioBuffer) continue;
+        
+        // Load into audio engine
+        await loadAudioFile(localAudioFile.id, localAudioFile.file);
+        
+        // Create clip
+        const trackId = voiceTrackMap.get(fragment.voiceId);
+        if (!trackId) continue;
+        
+        const newClip: AudioClip = {
+          id: `tts-clip-${fragment.id}`,
+          audioFileId: localAudioFile.id,
+          trackId,
+          startTime: currentTime,
+          duration: audioBuffer.duration,
+          offset: 0,
+          volume: 1.0,
+          fadeIn: 0.1,
+          fadeOut: 0.1,
+          name: `TTS: ${fragment.text.substring(0, 30)}...`
+        };
+        
+        newClips.push(newClip);
+        currentTime += audioBuffer.duration + 0.5; // 0.5s gap between fragments
+      }
+      
+      // Add clips to their respective tracks
+      for (const clip of newClips) {
+        const track = updatedTracks.find(t => t.id === clip.trackId);
+        if (track) {
+          track.clips.push(clip);
+        }
+      }
+      
+      // Save state for undo
+      saveState(tracks, 'Generate TTS Audio');
+      
+      // Update tracks
+      setTracks(updatedTracks);
+      
+      // Update timeline in audio engine
+      const allClips = updatedTracks.flatMap(track => track.clips);
+      await setTimelineData(updatedTracks, allClips);
+      
+      toast({
+        title: "TTS Audio Generated",
+        description: `Successfully generated ${results.length} audio fragments using ${voices.length} voices`
+      });
+      
+    } catch (error) {
+      console.error('TTS generation error:', error);
+      toast({
+        variant: "destructive",
+        title: "TTS Generation Failed",
+        description: error instanceof Error ? error.message : "An error occurred during audio generation"
+      });
+    } finally {
+      setIsTTSGenerating(false);
+      setTTSProgress({ completed: 0, total: 0 });
+    }
+  };
+
   // Handler for adding sound effect at current playhead position
   const handleAddEffect = async (effectUrl: string, effectName: string) => {
     try {
@@ -1069,6 +1212,9 @@ export default function AudioEditor() {
         onOpenProject={handleOpenProject}
         onImportTranscript={handleImportTranscript}
         onAddEffects={() => setIsEffectsModalOpen(true)}
+        onTTSImport={() => setIsTTSModalOpen(true)}
+        isTTSGenerating={isTTSGenerating}
+        ttsProgress={ttsProgress}
         data-testid="toolbar"
       />
       
@@ -1085,6 +1231,9 @@ export default function AudioEditor() {
           concatenateFiles={concatenateFiles}
           onImportTranscript={handleImportTranscript}
           onAddEffects={() => setIsEffectsModalOpen(true)}
+          onTTSImport={() => setIsTTSModalOpen(true)}
+          isTTSGenerating={isTTSGenerating}
+          ttsProgress={ttsProgress}
           data-testid="sidebar"
         />
         
@@ -1117,6 +1266,9 @@ export default function AudioEditor() {
           loadingTracks={loadingTracks}
           onImportTranscript={handleImportTranscript}
           onAddEffects={() => setIsEffectsModalOpen(true)}
+          onTTSImport={() => setIsTTSModalOpen(true)}
+          isTTSGenerating={isTTSGenerating}
+          ttsProgress={ttsProgress}
           getAudioBuffer={getAudioBuffer}
           data-testid="timeline"
         />
@@ -1146,6 +1298,12 @@ export default function AudioEditor() {
         onClose={() => setIsEffectsModalOpen(false)}
         onSelectEffect={handleAddEffect}
         currentTime={playbackState.currentTime}
+      />
+      
+      <TTSImportDialog
+        isOpen={isTTSModalOpen}
+        onClose={() => setIsTTSModalOpen(false)}
+        onImport={handleTTSImport}
       />
     </div>
   );

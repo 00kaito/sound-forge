@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Plus, Minus, Maximize2, Scissors, FileText, Sparkles } from 'lucide-react';
+import { Plus, Minus, Maximize2, Scissors, FileText, Sparkles, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TrackHeader } from '@/components/audio-editor/track-header';
 import { WaveformCanvas } from '@/components/audio-editor/waveform-canvas';
@@ -30,6 +30,9 @@ interface TimelineProps {
   loadingTracks?: Set<string>;
   onImportTranscript?: () => void;
   onAddEffects?: () => void;
+  onTTSImport?: () => void;
+  isTTSGenerating?: boolean;
+  ttsProgress?: { completed: number; total: number };
   getAudioBuffer?: (audioFileId: string) => AudioBuffer | undefined;
 }
 
@@ -58,6 +61,9 @@ export function Timeline({
   loadingTracks,
   onImportTranscript,
   onAddEffects,
+  onTTSImport,
+  isTTSGenerating = false,
+  ttsProgress = { completed: 0, total: 0 },
   getAudioBuffer
 }: TimelineProps) {
   const timelineRef = useRef<HTMLCanvasElement>(null);
@@ -457,6 +463,21 @@ export function Timeline({
               data-testid="button-tool-effects"
             >
               <Sparkles className="w-4 h-4" />
+            </Button>
+            
+            <Button
+              onClick={onTTSImport}
+              variant="outline"
+              size="sm"
+              disabled={isTTSGenerating}
+              className="text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 border border-orange-400/60 hover:border-orange-300/80 backdrop-blur-sm shadow-lg transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="TTS Import - Generate audio from text using AI voices"
+              data-testid="button-tool-tts"
+            >
+              <Mic className="w-4 h-4" />
+              {isTTSGenerating && (
+                <span className="ml-1 text-xs">{ttsProgress.completed}/{ttsProgress.total}</span>
+              )}
             </Button>
           </div>
         </div>

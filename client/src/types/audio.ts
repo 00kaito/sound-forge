@@ -61,3 +61,33 @@ export interface Transcript {
   segments: TranscriptSegment[];
   filename?: string;
 }
+
+// Text-to-Speech types
+export interface TTSVoice {
+  id: string;
+  name: string;
+  description: string;
+  gender: 'male' | 'female';
+  language: string;
+}
+
+export interface TTSTextFragment {
+  id: string;
+  text: string;
+  voiceId: string;
+  order: number;
+}
+
+export interface TTSProject {
+  id: string;
+  name: string;
+  fragments: TTSTextFragment[];
+  voices: TTSVoice[];
+  audioDuration: number; // seconds per fragment estimate
+}
+
+export interface TTSGenerationResult {
+  fragmentId: string;
+  audioBlob: Blob;
+  duration: number;
+}

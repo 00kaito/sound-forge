@@ -1,4 +1,4 @@
-import { Play, Pause, Square, SkipBack, Download, Settings, FolderOpen, Save, FileText, Volume2 } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, Download, Settings, FolderOpen, Save, FileText, Volume2, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlaybackState } from '@/types/audio';
 
@@ -14,6 +14,9 @@ interface ToolbarProps {
   onOpenProject?: () => void;
   onImportTranscript?: () => void;
   onAddEffects?: () => void;
+  onTTSImport?: () => void;
+  isTTSGenerating?: boolean;
+  ttsProgress?: { completed: number; total: number };
 }
 
 export function Toolbar({ 
@@ -27,7 +30,10 @@ export function Toolbar({
   onSaveProject,
   onOpenProject,
   onImportTranscript,
-  onAddEffects
+  onAddEffects,
+  onTTSImport,
+  isTTSGenerating = false,
+  ttsProgress = { completed: 0, total: 0 }
 }: ToolbarProps) {
   const handlePlay = () => {
     if (playbackState.isPlaying) {
@@ -72,6 +78,17 @@ export function Toolbar({
           >
             <Save className="w-4 h-4 mr-1" />
             Save Project
+          </Button>
+          <Button
+            onClick={onTTSImport}
+            variant="secondary"
+            size="sm"
+            disabled={isTTSGenerating}
+            className="bg-gradient-to-r from-purple-700 to-purple-600 hover:from-purple-600 hover:to-purple-500 text-white border border-purple-500/50 hover:border-purple-400/60 shadow-lg backdrop-blur-sm"
+            data-testid="button-tts-import"
+          >
+            <Mic className="w-4 h-4 mr-1" />
+            {isTTSGenerating ? `Generating ${ttsProgress.completed}/${ttsProgress.total}` : 'TTS Import'}
           </Button>
         </div>
       </div>
