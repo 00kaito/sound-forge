@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Play, User, Users } from "lucide-react";
+import { Trash2, Play, User, Users, CheckSquare, Square, Volume2 } from "lucide-react";
 import { TTSService } from "@/lib/tts-service";
 import type { TTSVoice, TTSTextFragment } from "@/types/audio";
 
@@ -20,6 +21,8 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   const [rawText, setRawText] = useState("");
   const [fragments, setFragments] = useState<TTSTextFragment[]>([]);
   const [selectedVoices, setSelectedVoices] = useState<Set<string>>(new Set());
+  const [selectedFragments, setSelectedFragments] = useState<Set<string>>(new Set());
+  const [bulkVoiceId, setBulkVoiceId] = useState<string>("");
   const dialogId = useId();
 
   const availableVoices = TTSService.AVAILABLE_VOICES;
@@ -59,6 +62,54 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   // Remove a fragment
   const removeFragment = (fragmentId: string) => {
     setFragments(prev => prev.filter(f => f.id !== fragmentId));
+    setSelectedFragments(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fragmentId);
+      return newSet;
+    });
+  };
+
+  // Toggle fragment selection
+  const toggleFragmentSelection = (fragmentId: string) => {
+    setSelectedFragments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(fragmentId)) {
+        newSet.delete(fragmentId);
+      } else {
+        newSet.add(fragmentId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all fragments
+  const selectAllFragments = () => {
+    const allIds = new Set(fragments.map(f => f.id));
+    setSelectedFragments(allIds);
+  };
+
+  // Deselect all fragments
+  const deselectAllFragments = () => {
+    setSelectedFragments(new Set());
+  };
+
+  // Apply voice to selected fragments
+  const applyBulkVoice = () => {
+    if (!bulkVoiceId || selectedFragments.size === 0) return;
+    
+    setFragments(prev => prev.map(fragment => 
+      selectedFragments.has(fragment.id)
+        ? { ...fragment, voiceId: bulkVoiceId }
+        : fragment
+    ));
+    
+    // Track which voices are being used
+    const updatedVoices = new Set(selectedVoices);
+    updatedVoices.add(bulkVoiceId);
+    setSelectedVoices(updatedVoices);
+    
+    // Clear selection after applying
+    setSelectedFragments(new Set());
   };
 
   // Get voice info by ID
@@ -93,6 +144,8 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     setRawText("");
     setFragments([]);
     setSelectedVoices(new Set());
+    setSelectedFragments(new Set());
+    setBulkVoiceId("");
   };
 
   // Estimate total duration
@@ -145,15 +198,88 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                 </Badge>
               </div>
 
+              {/* Bulk Operations */}
+              <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Volume2 className="w-4 h-4" />
+                      Operacje grupowe
+                    </Label>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      Zaznaczono: {selectedFragments.size} fragmentów
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectedFragments.size === fragments.length ? deselectAllFragments : selectAllFragments}
+                      data-testid="button-select-all"
+                    >
+                      {selectedFragments.size === fragments.length ? (
+                        <>
+                          <Square className="w-3 h-3 mr-1" />
+                          Odznacz wszystkie
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="w-3 h-3 mr-1" />
+                          Zaznacz wszystkie
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Select value={bulkVoiceId} onValueChange={setBulkVoiceId}>
+                      <SelectTrigger className="w-48" data-testid="select-bulk-voice">
+                        <SelectValue placeholder="Wybierz głos..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableVoices.map(voice => (
+                          <SelectItem key={voice.id} value={voice.id}>
+                            <div className="flex items-center gap-2">
+                              <User className="w-3 h-3" />
+                              <span>{voice.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {voice.gender}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={applyBulkVoice}
+                      disabled={!bulkVoiceId || selectedFragments.size === 0}
+                      data-testid="button-apply-bulk-voice"
+                    >
+                      Zastosuj głos
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+
               <div className="grid gap-3 max-h-60 overflow-y-auto">
                 {fragments.map((fragment, index) => {
                   const voice = getVoiceById(fragment.voiceId);
+                  const isSelected = selectedFragments.has(fragment.id);
                   return (
-                    <Card key={fragment.id} className="p-3">
+                    <Card key={fragment.id} className={`p-3 transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800' : ''}`}>
                       <div className="flex items-start gap-3">
-                        <Badge variant="secondary" className="mt-1">
-                          {index + 1}
-                        </Badge>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleFragmentSelection(fragment.id)}
+                            data-testid={`checkbox-${fragment.id}`}
+                          />
+                          <Badge variant="secondary">
+                            {index + 1}
+                          </Badge>
+                        </div>
                         
                         <div className="flex-1 space-y-2">
                           <p className="text-sm">{fragment.text}</p>
