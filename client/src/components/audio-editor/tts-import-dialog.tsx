@@ -23,6 +23,9 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   const [selectedVoices, setSelectedVoices] = useState<Set<string>>(new Set());
   const [selectedFragments, setSelectedFragments] = useState<Set<string>>(new Set());
   const [bulkVoiceId, setBulkVoiceId] = useState<string>("");
+  const [isAlternatingVoices, setIsAlternatingVoices] = useState<boolean>(false);
+  const [alternatingVoice1, setAlternatingVoice1] = useState<string>("");
+  const [alternatingVoice2, setAlternatingVoice2] = useState<string>("");
   const dialogId = useId();
 
   const availableVoices = TTSService.AVAILABLE_VOICES;
@@ -33,16 +36,66 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     
     if (text.trim()) {
       const textLines = TTSService.parseTextToFragments(text);
-      const newFragments: TTSTextFragment[] = textLines.map((line, index) => ({
-        id: `fragment-${index + 1}`,
-        text: line,
-        voiceId: availableVoices[0].id, // Default to first voice
-        order: index
-      }));
+      const newFragments: TTSTextFragment[] = textLines.map((line, index) => {
+        let voiceId = availableVoices[0].id; // Default to first voice
+        
+        // Apply alternating voices if enabled
+        if (isAlternatingVoices && alternatingVoice1 && alternatingVoice2) {
+          voiceId = index % 2 === 0 ? alternatingVoice1 : alternatingVoice2;
+        }
+        
+        return {
+          id: `fragment-${index + 1}`,
+          text: line,
+          voiceId,
+          order: index
+        };
+      });
       setFragments(newFragments);
     } else {
       setFragments([]);
     }
+  };
+
+  // Re-apply voice assignment when alternating mode changes
+  const handleAlternatingModeChange = (enabled: boolean) => {
+    setIsAlternatingVoices(enabled);
+    
+    if (enabled && alternatingVoice1 && alternatingVoice2 && fragments.length > 0) {
+      const updatedFragments = fragments.map((fragment, index) => ({
+        ...fragment,
+        voiceId: index % 2 === 0 ? alternatingVoice1 : alternatingVoice2
+      }));
+      setFragments(updatedFragments);
+    }
+  };
+
+  // Apply alternating voices when voices are selected
+  const handleAlternatingVoicesUpdate = (voice1: string, voice2: string) => {
+    setAlternatingVoice1(voice1);
+    setAlternatingVoice2(voice2);
+    
+    if (isAlternatingVoices && voice1 && voice2 && fragments.length > 0) {
+      const updatedFragments = fragments.map((fragment, index) => ({
+        ...fragment,
+        voiceId: index % 2 === 0 ? voice1 : voice2
+      }));
+      setFragments(updatedFragments);
+    }
+  };
+
+  // Change all fragments of one voice to another
+  const changeAllVoicesOfType = (fromVoiceId: string, toVoiceId: string) => {
+    setFragments(prev => prev.map(fragment => 
+      fragment.voiceId === fromVoiceId 
+        ? { ...fragment, voiceId: toVoiceId }
+        : fragment
+    ));
+    
+    // Track which voices are being used
+    const updatedVoices = new Set(selectedVoices);
+    updatedVoices.add(toVoiceId);
+    setSelectedVoices(updatedVoices);
   };
 
   // Update voice for a specific fragment
@@ -176,6 +229,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
               onChange={(e) => handleTextChange(e.target.value)}
               className="min-h-32"
               data-testid="textarea-tts-input"
+              style={{ whiteSpace: 'pre-wrap' }}
             />
             <p className="text-sm text-muted-foreground">
               Tekst zostanie podzielony na {fragments.length} fragmentów
@@ -183,6 +237,80 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                 <> • Szacowany czas: {formatDuration(estimatedDuration)}</>
               )}
             </p>
+          </div>
+
+          {/* Alternating Voices Option */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="alternating-voices"
+                checked={isAlternatingVoices}
+                onCheckedChange={(checked) => handleAlternatingModeChange(!!checked)}
+                data-testid="checkbox-alternating-voices"
+              />
+              <Label htmlFor="alternating-voices" className="text-sm font-medium">
+                Głosy naprzemienne (dialog dwuosobowy)
+              </Label>
+            </div>
+            
+            {isAlternatingVoices && (
+              <Card className="p-3 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Wybierz głosy dla dialogu:</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Głos 1 (nieparzyste linie)</Label>
+                      <Select 
+                        value={alternatingVoice1} 
+                        onValueChange={(voiceId) => handleAlternatingVoicesUpdate(voiceId, alternatingVoice2)}
+                      >
+                        <SelectTrigger data-testid="select-alternating-voice-1">
+                          <SelectValue placeholder="Wybierz głos..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableVoices.map(voice => (
+                            <SelectItem key={voice.id} value={voice.id}>
+                              <div className="flex items-center gap-2">
+                                <User className="w-3 h-3" />
+                                <span>{voice.name}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {voice.gender}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Głos 2 (parzyste linie)</Label>
+                      <Select 
+                        value={alternatingVoice2} 
+                        onValueChange={(voiceId) => handleAlternatingVoicesUpdate(alternatingVoice1, voiceId)}
+                      >
+                        <SelectTrigger data-testid="select-alternating-voice-2">
+                          <SelectValue placeholder="Wybierz głos..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableVoices.map(voice => (
+                            <SelectItem key={voice.id} value={voice.id}>
+                              <div className="flex items-center gap-2">
+                                <User className="w-3 h-3" />
+                                <span>{voice.name}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {voice.gender}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
 
           {/* Fragment Assignment */}
@@ -284,7 +412,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         <div className="flex-1 space-y-2">
                           <p className="text-sm">{fragment.text}</p>
                           
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <Select 
                               value={fragment.voiceId} 
                               onValueChange={(voiceId) => updateFragmentVoice(fragment.id, voiceId)}
@@ -306,6 +434,21 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                                 ))}
                               </SelectContent>
                             </Select>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newVoiceId = prompt(`Zmień wszystkie fragmenty z głosu "${voice?.name}" na inny głos. Wybierz nowy głos:`);
+                                if (newVoiceId && availableVoices.find(v => v.id === newVoiceId)) {
+                                  changeAllVoicesOfType(fragment.voiceId, newVoiceId);
+                                }
+                              }}
+                              className="text-xs"
+                              data-testid={`button-change-all-${fragment.id}`}
+                            >
+                              Zmień wszystkie
+                            </Button>
                             
                             {voice && (
                               <span className="text-xs text-muted-foreground">

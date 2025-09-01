@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, RefreshCw, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TranscriptSegment } from '@/types/audio';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { TranscriptSegment, TTSVoice } from '@/types/audio';
 import { formatTranscriptTime } from '@/lib/transcript-parser';
+import { TTSService } from '@/lib/tts-service';
 
 interface TranscriptPanelProps {
   transcript: TranscriptSegment[] | null;
@@ -12,6 +15,8 @@ interface TranscriptPanelProps {
   onSeekTo: (time: number) => void;
   width: number;
   onWidthChange: (width: number) => void;
+  onRegenerateSegment?: (segmentId: string, text: string, voiceId: string, startTime: number, duration: number) => void;
+  isTTSGenerating?: boolean;
 }
 
 export function TranscriptPanel({
@@ -21,12 +26,18 @@ export function TranscriptPanel({
   onClose,
   onSeekTo,
   width,
-  onWidthChange
+  onWidthChange,
+  onRegenerateSegment,
+  isTTSGenerating = false
 }: TranscriptPanelProps) {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const activeSegmentRef = useRef<HTMLDivElement>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
+  const [selectedVoices, setSelectedVoices] = useState<Map<string, string>>(new Map());
+
+  const availableVoices = TTSService.AVAILABLE_VOICES;
 
   // Find active segment based on current time
   useEffect(() => {
@@ -180,27 +191,122 @@ export function TranscriptPanel({
                   <div
                     key={segment.id}
                     ref={isActive ? activeSegmentRef : null}
-                    className={`p-3 rounded cursor-pointer transition-all duration-200 ${
+                    className={`p-3 rounded transition-all duration-200 ${
                       isActive 
                         ? 'bg-blue-600/30 border border-blue-500/50 shadow-md' 
                         : 'hover:bg-gray-700/50 border border-transparent'
                     }`}
-                    onClick={() => onSeekTo(segment.startTime)}
                     data-testid={`transcript-segment-${segment.id}`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-gray-400 font-mono">
                         {formatTranscriptTime(segment.startTime)}
                       </span>
-                      <span className="text-xs text-gray-500">
-                        {formatTranscriptTime(segment.endTime)}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-500">
+                          {formatTranscriptTime(segment.endTime)}
+                        </span>
+                        {onRegenerateSegment && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const isExpanded = expandedSegments.has(segment.id);
+                              const newExpanded = new Set(expandedSegments);
+                              if (isExpanded) {
+                                newExpanded.delete(segment.id);
+                              } else {
+                                newExpanded.add(segment.id);
+                              }
+                              setExpandedSegments(newExpanded);
+                            }}
+                            className="h-6 w-6 p-0 hover:bg-gray-600"
+                            data-testid={`button-expand-${segment.id}`}
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <p className={`text-sm leading-relaxed ${
-                      isActive ? 'text-white font-medium' : 'text-gray-200'
-                    }`}>
+                    
+                    <p 
+                      className={`text-sm leading-relaxed cursor-pointer ${
+                        isActive ? 'text-white font-medium' : 'text-gray-200'
+                      }`}
+                      onClick={() => onSeekTo(segment.startTime)}
+                    >
                       {segment.text}
                     </p>
+
+                    {/* Regeneration Controls */}
+                    {expandedSegments.has(segment.id) && onRegenerateSegment && (
+                      <div className="mt-3 pt-2 border-t border-gray-600 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Select 
+                            value={selectedVoices.get(segment.id) || availableVoices[0].id}
+                            onValueChange={(voiceId) => {
+                              const newSelectedVoices = new Map(selectedVoices);
+                              newSelectedVoices.set(segment.id, voiceId);
+                              setSelectedVoices(newSelectedVoices);
+                            }}
+                          >
+                            <SelectTrigger className="flex-1" data-testid={`select-voice-${segment.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableVoices.map(voice => (
+                                <SelectItem key={voice.id} value={voice.id}>
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-3 h-3" />
+                                    <span>{voice.name}</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {voice.gender}
+                                    </Badge>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const voiceId = selectedVoices.get(segment.id) || availableVoices[0].id;
+                              const duration = segment.endTime - segment.startTime;
+                              onRegenerateSegment(segment.id, segment.text, voiceId, segment.startTime, duration);
+                              
+                              // Close expanded panel after regeneration
+                              const newExpanded = new Set(expandedSegments);
+                              newExpanded.delete(segment.id);
+                              setExpandedSegments(newExpanded);
+                            }}
+                            disabled={isTTSGenerating}
+                            className="flex-1"
+                            data-testid={`button-regenerate-${segment.id}`}
+                          >
+                            <RefreshCw className={`w-3 h-3 mr-1 ${isTTSGenerating ? 'animate-spin' : ''}`} />
+                            {isTTSGenerating ? 'Generuję...' : 'Regeneruj'}
+                          </Button>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newExpanded = new Set(expandedSegments);
+                              newExpanded.delete(segment.id);
+                              setExpandedSegments(newExpanded);
+                            }}
+                            data-testid={`button-cancel-${segment.id}`}
+                          >
+                            Anuluj
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

@@ -879,6 +879,150 @@ export default function AudioEditor() {
     document.body.removeChild(input);
   };
 
+  // Single segment regeneration functionality
+  const handleRegenerateSegment = async (segmentId: string, text: string, voiceId: string, startTime: number, duration: number) => {
+    setIsTTSGenerating(true);
+    
+    try {
+      if (!isInitialized) {
+        await initialize();
+      }
+      
+      // Find the voice
+      const voice = TTSService.AVAILABLE_VOICES.find(v => v.id === voiceId);
+      if (!voice) {
+        throw new Error(`Nie znaleziono głosu o ID: ${voiceId}`);
+      }
+      
+      // Create fragment for this single segment
+      const fragment: TTSTextFragment = {
+        id: `regen-${segmentId}-${Date.now()}`,
+        text,
+        voiceId,
+        order: 0
+      };
+      
+      // Generate audio
+      const result = await TTSService.generateAudioForFragment(fragment, voice);
+      
+      // Convert blob to audio file and add to storage
+      const audioFile = new File([result.audioBlob], `tts-regen-${segmentId}.mp3`, { type: 'audio/mp3' });
+      const localAudioFile = await addAudioFile(audioFile);
+      
+      // Load audio buffer to get real duration
+      const audioBuffer = await loadAudioBuffer(localAudioFile);
+      if (!audioBuffer) throw new Error('Failed to load audio buffer');
+      
+      // Load into audio engine
+      if (isInitialized) {
+        await loadAudioFile(localAudioFile.id, localAudioFile.file);
+      }
+      
+      // Find or create track for this voice
+      let targetTrackId: string | null = null;
+      const voiceTrackName = `${voice.name} Track`;
+      
+      // Look for existing track for this voice
+      const existingTrack = tracks.find(track => track.name === voiceTrackName);
+      if (existingTrack) {
+        targetTrackId = existingTrack.id;
+      } else {
+        // Create new track
+        const newTrackId = `track-${Date.now()}-${voiceId}`;
+        const newTrack: Track = {
+          id: newTrackId,
+          name: voiceTrackName,
+          volume: 0.8,
+          pan: 0,
+          muted: false,
+          solo: false,
+          clips: []
+        };
+        
+        setTracks(prev => [...prev, newTrack]);
+        createTrackGain(newTrackId);
+        targetTrackId = newTrackId;
+        
+        // Wait for track to be created
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Remove any existing clips at this time position on the target track
+      setTracks(prev => prev.map(track => {
+        if (track.id === targetTrackId) {
+          return {
+            ...track,
+            clips: track.clips.filter(clip => {
+              const clipEnd = clip.startTime + clip.duration;
+              const segmentEnd = startTime + duration;
+              // Remove clips that overlap with this time range
+              return !(clip.startTime < segmentEnd && clipEnd > startTime);
+            })
+          };
+        }
+        return track;
+      }));
+      
+      // Create new clip at the exact same time position
+      const newClip: AudioClip = {
+        id: `regen-clip-${segmentId}-${Date.now()}`,
+        audioFileId: localAudioFile.id,
+        trackId: targetTrackId,
+        startTime: startTime,
+        duration: audioBuffer.duration,
+        offset: 0,
+        volume: 1.0,
+        fadeIn: 0.1,
+        fadeOut: 0.1,
+        name: `TTS: ${text.substring(0, 30)}...`
+      };
+      
+      // Add the new clip
+      setTracks(prev => prev.map(track => {
+        if (track.id === targetTrackId) {
+          return {
+            ...track,
+            clips: [...track.clips, newClip]
+          };
+        }
+        return track;
+      }));
+      
+      // Update transcript segment with new duration if needed
+      if (transcript) {
+        const updatedSegments = transcript.segments.map(segment => {
+          if (segment.id === segmentId) {
+            return {
+              ...segment,
+              endTime: startTime + audioBuffer.duration
+            };
+          }
+          return segment;
+        });
+        
+        setTranscript({
+          ...transcript,
+          segments: updatedSegments
+        });
+      }
+      
+      toast({
+        title: "Fragment Regenerated",
+        description: `Successfully regenerated segment with ${voice.name} voice`
+      });
+      
+    } catch (error) {
+      console.error('Regeneration error:', error);
+      toast({
+        variant: "destructive",
+        title: "Regeneration Failed",
+        description: error instanceof Error ? error.message : "An error occurred during regeneration"
+      });
+    } finally {
+      setIsTTSGenerating(false);
+    }
+  };
+
   // TTS Generation functionality
   const handleTTSImport = async (fragments: TTSTextFragment[], voices: TTSVoice[]) => {
     setIsTTSGenerating(true);
@@ -1317,6 +1461,8 @@ export default function AudioEditor() {
         onSeekTo={seekTo}
         width={transcriptPanelWidth}
         onWidthChange={setTranscriptPanelWidth}
+        onRegenerateSegment={handleRegenerateSegment}
+        isTTSGenerating={isTTSGenerating}
       />
 
       <ExportModal
