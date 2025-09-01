@@ -939,8 +939,14 @@ export default function AudioEditor() {
       
       // Process each generated audio result
       currentTime = 0;
-      const newClips: AudioClip[] = [];
       
+      // Save state for undo before making changes
+      saveState(tracks, 'Generate TTS Audio');
+      
+      // First, update tracks with new empty tracks for voices
+      setTracks(updatedTracks);
+      
+      // Process each result and add clips properly
       for (let i = 0; i < fragments.length; i++) {
         const fragment = fragments[i];
         const result = results.find(r => r.fragmentId === fragment.id);
@@ -951,14 +957,11 @@ export default function AudioEditor() {
         const audioFile = new File([result.audioBlob], `tts-${fragment.id}.mp3`, { type: 'audio/mp3' });
         const localAudioFile = await addAudioFile(audioFile);
         
-        // Load audio buffer
+        // Load audio buffer to get real duration
         const audioBuffer = await loadAudioBuffer(localAudioFile);
         if (!audioBuffer) continue;
         
-        // Load into audio engine
-        await loadAudioFile(localAudioFile.id, localAudioFile.file);
-        
-        // Create clip
+        // Create clip with real duration
         const trackId = voiceTrackMap.get(fragment.voiceId);
         if (!trackId) continue;
         
@@ -967,7 +970,7 @@ export default function AudioEditor() {
           audioFileId: localAudioFile.id,
           trackId,
           startTime: currentTime,
-          duration: audioBuffer.duration,
+          duration: audioBuffer.duration, // Use real duration from audio buffer
           offset: 0,
           volume: 1.0,
           fadeIn: 0.1,
@@ -975,27 +978,11 @@ export default function AudioEditor() {
           name: `TTS: ${fragment.text.substring(0, 30)}...`
         };
         
-        newClips.push(newClip);
+        // Use the proper addClipToTrack function which handles audio engine loading
+        await addClipToTrack(trackId, newClip);
+        
         currentTime += audioBuffer.duration + 0.5; // 0.5s gap between fragments
       }
-      
-      // Add clips to their respective tracks
-      for (const clip of newClips) {
-        const track = updatedTracks.find(t => t.id === clip.trackId);
-        if (track) {
-          track.clips.push(clip);
-        }
-      }
-      
-      // Save state for undo
-      saveState(tracks, 'Generate TTS Audio');
-      
-      // Update tracks
-      setTracks(updatedTracks);
-      
-      // Update timeline in audio engine
-      const allClips = updatedTracks.flatMap(track => track.clips);
-      await setTimelineData(updatedTracks, allClips);
       
       toast({
         title: "TTS Audio Generated",
