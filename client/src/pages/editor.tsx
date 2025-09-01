@@ -946,6 +946,9 @@ export default function AudioEditor() {
       // First, update tracks with new empty tracks for voices
       setTracks(updatedTracks);
       
+      // Wait for tracks state to be updated before proceeding
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Process each result and add clips properly
       for (let i = 0; i < fragments.length; i++) {
         const fragment = fragments[i];
@@ -960,6 +963,12 @@ export default function AudioEditor() {
         // Load audio buffer to get real duration
         const audioBuffer = await loadAudioBuffer(localAudioFile);
         if (!audioBuffer) continue;
+        
+        // Load into audio engine first
+        if (isInitialized) {
+          console.log('TTS: Loading audio file into engine', localAudioFile.id);
+          await loadAudioFile(localAudioFile.id, localAudioFile.file);
+        }
         
         // Create clip with real duration
         const trackId = voiceTrackMap.get(fragment.voiceId);
@@ -978,8 +987,20 @@ export default function AudioEditor() {
           name: `TTS: ${fragment.text.substring(0, 30)}...`
         };
         
-        // Use the proper addClipToTrack function which handles audio engine loading
-        await addClipToTrack(trackId, newClip);
+        // Add clip directly to tracks state instead of using addClipToTrack
+        // to avoid conflicts with async state updates
+        setTracks(prevTracks => {
+          return prevTracks.map(track => {
+            if (track.id === trackId) {
+              console.log('TTS: Adding clip to track', trackId, newClip.name);
+              return {
+                ...track,
+                clips: [...track.clips, newClip]
+              };
+            }
+            return track;
+          });
+        });
         
         currentTime += audioBuffer.duration + 0.5; // 0.5s gap between fragments
       }
