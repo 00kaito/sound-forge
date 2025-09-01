@@ -901,108 +901,105 @@ export default function AudioEditor() {
       // Group fragments by voice to organize into tracks
       const fragmentsByVoice = TTSService.groupFragmentsByVoice(fragments);
       const voiceTrackMap = new Map<string, string>();
-      let currentTime = 0;
-      
-      // Find or create tracks for each voice
-      const updatedTracks = [...tracks];
-      
-      for (const voiceId of Array.from(fragmentsByVoice.keys())) {
-        const voiceFragments = fragmentsByVoice.get(voiceId)!;
-        const voice = voices.find(v => v.id === voiceId);
-        if (!voice) continue;
-        
-        // Find an empty track or create a new one
-        let targetTrack = updatedTracks.find(track => track.clips.length === 0);
-        
-        if (!targetTrack) {
-          const newTrackId = `track-${Date.now()}-${voiceId}`;
-          targetTrack = {
-            id: newTrackId,
-            name: `${voice.name} Track`,
-            volume: 0.8,
-            pan: 0,
-            muted: false,
-            solo: false,
-            clips: []
-          };
-          updatedTracks.push(targetTrack);
-          
-          // Create track gain for new track
-          createTrackGain(newTrackId);
-        } else {
-          // Rename existing track
-          targetTrack.name = `${voice.name} Track`;
-        }
-        
-        voiceTrackMap.set(voiceId, targetTrack.id);
-      }
-      
-      // Process each generated audio result
-      currentTime = 0;
       
       // Save state for undo before making changes
       saveState(tracks, 'Generate TTS Audio');
       
-      // First, update tracks with new empty tracks for voices
-      setTracks(updatedTracks);
+      // Clear old TTS tracks and create fresh ones for each voice
+      const baseTracks = tracks.filter(track => !track.name.includes('Track') || track.clips.length > 0);
+      const updatedTracks: Track[] = [...baseTracks];
       
-      // Wait for tracks state to be updated before proceeding
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Process each result and add clips properly
-      for (let i = 0; i < fragments.length; i++) {
-        const fragment = fragments[i];
-        const result = results.find(r => r.fragmentId === fragment.id);
+      // Create tracks for each voice
+      for (const voiceId of Array.from(fragmentsByVoice.keys())) {
+        const voice = voices.find(v => v.id === voiceId);
+        if (!voice) continue;
         
-        if (!result) continue;
-        
-        // Convert blob to audio file and add to storage
-        const audioFile = new File([result.audioBlob], `tts-${fragment.id}.mp3`, { type: 'audio/mp3' });
-        const localAudioFile = await addAudioFile(audioFile);
-        
-        // Load audio buffer to get real duration
-        const audioBuffer = await loadAudioBuffer(localAudioFile);
-        if (!audioBuffer) continue;
-        
-        // Load into audio engine first
-        if (isInitialized) {
-          console.log('TTS: Loading audio file into engine', localAudioFile.id);
-          await loadAudioFile(localAudioFile.id, localAudioFile.file);
-        }
-        
-        // Create clip with real duration
-        const trackId = voiceTrackMap.get(fragment.voiceId);
-        if (!trackId) continue;
-        
-        const newClip: AudioClip = {
-          id: `tts-clip-${fragment.id}`,
-          audioFileId: localAudioFile.id,
-          trackId,
-          startTime: currentTime,
-          duration: audioBuffer.duration, // Use real duration from audio buffer
-          offset: 0,
-          volume: 1.0,
-          fadeIn: 0.1,
-          fadeOut: 0.1,
-          name: `TTS: ${fragment.text.substring(0, 30)}...`
+        const newTrackId = `track-${Date.now()}-${voiceId}`;
+        const newTrack: Track = {
+          id: newTrackId,
+          name: `${voice.name} Track`,
+          volume: 0.8,
+          pan: 0,
+          muted: false,
+          solo: false,
+          clips: []
         };
         
-        // Add clip directly to tracks state instead of using addClipToTrack
-        // to avoid conflicts with async state updates
-        setTracks(prevTracks => {
-          return prevTracks.map(track => {
-            if (track.id === trackId) {
-              console.log('TTS: Adding clip to track', trackId, newClip.name);
-              return {
-                ...track,
-                clips: [...track.clips, newClip]
-              };
-            }
-            return track;
-          });
-        });
+        updatedTracks.push(newTrack);
+        voiceTrackMap.set(voiceId, newTrackId);
         
-        currentTime += audioBuffer.duration + 0.5; // 0.5s gap between fragments
+        // Create track gain for new track
+        createTrackGain(newTrackId);
+        console.log('TTS: Created track for voice', voice.name, newTrackId);
+      }
+      
+      // Update tracks with new structure
+      setTracks(updatedTracks);
+      
+      // Wait for tracks state to be updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Process each voice separately to maintain proper track assignment
+      for (const [voiceId, voiceFragments] of fragmentsByVoice.entries()) {
+        const trackId = voiceTrackMap.get(voiceId);
+        if (!trackId) continue;
+        
+        let voiceCurrentTime = 0; // Reset time for each voice track
+        
+        console.log(`TTS: Processing ${voiceFragments.length} fragments for voice ${voiceId} on track ${trackId}`);
+        
+        // Process fragments for this specific voice
+        for (const fragment of voiceFragments) {
+          const result = results.find(r => r.fragmentId === fragment.id);
+          if (!result) continue;
+          
+          // Convert blob to audio file and add to storage
+          const audioFile = new File([result.audioBlob], `tts-${fragment.id}.mp3`, { type: 'audio/mp3' });
+          const localAudioFile = await addAudioFile(audioFile);
+          
+          // Load audio buffer to get real duration
+          const audioBuffer = await loadAudioBuffer(localAudioFile);
+          if (!audioBuffer) continue;
+          
+          // Load into audio engine
+          if (isInitialized) {
+            console.log('TTS: Loading audio file into engine', localAudioFile.id);
+            await loadAudioFile(localAudioFile.id, localAudioFile.file);
+          }
+          
+          // Create clip with real duration
+          const newClip: AudioClip = {
+            id: `tts-clip-${fragment.id}`,
+            audioFileId: localAudioFile.id,
+            trackId,
+            startTime: voiceCurrentTime,
+            duration: audioBuffer.duration,
+            offset: 0,
+            volume: 1.0,
+            fadeIn: 0.1,
+            fadeOut: 0.1,
+            name: `TTS: ${fragment.text.substring(0, 30)}...`
+          };
+          
+          // Add clip to the specific voice track
+          setTracks(prevTracks => {
+            return prevTracks.map(track => {
+              if (track.id === trackId) {
+                console.log('TTS: Adding clip to track', trackId, track.name, newClip.name);
+                return {
+                  ...track,
+                  clips: [...track.clips, newClip]
+                };
+              }
+              return track;
+            });
+          });
+          
+          voiceCurrentTime += audioBuffer.duration + 0.5; // 0.5s gap between fragments
+          
+          // Small delay to ensure state updates properly
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
       }
       
       toast({
