@@ -939,67 +939,95 @@ export default function AudioEditor() {
       // Wait for tracks state to be updated
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Process each voice separately to maintain proper track assignment
-      for (const [voiceId, voiceFragments] of fragmentsByVoice.entries()) {
-        const trackId = voiceTrackMap.get(voiceId);
+      // Process fragments in dialog order (chronologically) instead of by voice
+      // This ensures proper dialog flow across different voice tracks
+      
+      // Sort fragments by their original order (index in fragments array)
+      const sortedFragments = [...fragments].sort((a, b) => {
+        const aIndex = fragments.findIndex(f => f.id === a.id);
+        const bIndex = fragments.findIndex(f => f.id === b.id);
+        return aIndex - bIndex;
+      });
+      
+      let globalTime = 0; // Global timeline position for dialog flow
+      const transcriptSegments: any[] = []; // For creating transcript
+      
+      console.log(`TTS: Processing ${sortedFragments.length} fragments in dialog order`);
+      
+      // Process fragments in chronological order
+      for (const fragment of sortedFragments) {
+        const result = results.find(r => r.fragmentId === fragment.id);
+        if (!result) continue;
+        
+        const trackId = voiceTrackMap.get(fragment.voiceId);
         if (!trackId) continue;
         
-        let voiceCurrentTime = 0; // Reset time for each voice track
+        // Convert blob to audio file and add to storage
+        const audioFile = new File([result.audioBlob], `tts-${fragment.id}.mp3`, { type: 'audio/mp3' });
+        const localAudioFile = await addAudioFile(audioFile);
         
-        console.log(`TTS: Processing ${voiceFragments.length} fragments for voice ${voiceId} on track ${trackId}`);
+        // Load audio buffer to get real duration
+        const audioBuffer = await loadAudioBuffer(localAudioFile);
+        if (!audioBuffer) continue;
         
-        // Process fragments for this specific voice
-        for (const fragment of voiceFragments) {
-          const result = results.find(r => r.fragmentId === fragment.id);
-          if (!result) continue;
-          
-          // Convert blob to audio file and add to storage
-          const audioFile = new File([result.audioBlob], `tts-${fragment.id}.mp3`, { type: 'audio/mp3' });
-          const localAudioFile = await addAudioFile(audioFile);
-          
-          // Load audio buffer to get real duration
-          const audioBuffer = await loadAudioBuffer(localAudioFile);
-          if (!audioBuffer) continue;
-          
-          // Load into audio engine
-          if (isInitialized) {
-            console.log('TTS: Loading audio file into engine', localAudioFile.id);
-            await loadAudioFile(localAudioFile.id, localAudioFile.file);
-          }
-          
-          // Create clip with real duration
-          const newClip: AudioClip = {
-            id: `tts-clip-${fragment.id}`,
-            audioFileId: localAudioFile.id,
-            trackId,
-            startTime: voiceCurrentTime,
-            duration: audioBuffer.duration,
-            offset: 0,
-            volume: 1.0,
-            fadeIn: 0.1,
-            fadeOut: 0.1,
-            name: `TTS: ${fragment.text.substring(0, 30)}...`
-          };
-          
-          // Add clip to the specific voice track
-          setTracks(prevTracks => {
-            return prevTracks.map(track => {
-              if (track.id === trackId) {
-                console.log('TTS: Adding clip to track', trackId, track.name, newClip.name);
-                return {
-                  ...track,
-                  clips: [...track.clips, newClip]
-                };
-              }
-              return track;
-            });
-          });
-          
-          voiceCurrentTime += audioBuffer.duration + 0.5; // 0.5s gap between fragments
-          
-          // Small delay to ensure state updates properly
-          await new Promise(resolve => setTimeout(resolve, 50));
+        // Load into audio engine
+        if (isInitialized) {
+          console.log('TTS: Loading audio file into engine', localAudioFile.id);
+          await loadAudioFile(localAudioFile.id, localAudioFile.file);
         }
+        
+        // Create clip at global timeline position
+        const newClip: AudioClip = {
+          id: `tts-clip-${fragment.id}`,
+          audioFileId: localAudioFile.id,
+          trackId,
+          startTime: globalTime,
+          duration: audioBuffer.duration,
+          offset: 0,
+          volume: 1.0,
+          fadeIn: 0.1,
+          fadeOut: 0.1,
+          name: `TTS: ${fragment.text.substring(0, 30)}...`
+        };
+        
+        // Add clip to the specific voice track
+        setTracks(prevTracks => {
+          return prevTracks.map(track => {
+            if (track.id === trackId) {
+              console.log('TTS: Adding clip to track', trackId, track.name, newClip.name, 'at time', globalTime);
+              return {
+                ...track,
+                clips: [...track.clips, newClip]
+              };
+            }
+            return track;
+          });
+        });
+        
+        // Create transcript segment
+        transcriptSegments.push({
+          id: `tts-segment-${fragment.id}`,
+          startTime: globalTime,
+          endTime: globalTime + audioBuffer.duration,
+          text: fragment.text
+        });
+        
+        // Move global time forward for next fragment
+        globalTime += audioBuffer.duration + 0.5; // 0.5s gap between fragments
+        
+        // Small delay to ensure state updates properly
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      // Create and display transcript from generated TTS
+      if (transcriptSegments.length > 0) {
+        setTranscript({
+          segments: transcriptSegments,
+          filename: 'Generated TTS Dialog'
+        });
+        setIsTranscriptVisible(true);
+        
+        console.log('TTS: Created transcript with', transcriptSegments.length, 'segments');
       }
       
       toast({
