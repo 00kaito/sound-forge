@@ -35,6 +35,14 @@ export interface LocalAudioFile {
   name: string;
   duration: number;
   audioBuffer?: AudioBuffer;
+  category?: string; // For grouping in library
+}
+
+export interface AudioCategory {
+  id: string;
+  name: string;
+  collapsed: boolean;
+  fileIds: string[];
 }
 
 export interface ExportSettings {

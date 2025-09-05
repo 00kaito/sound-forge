@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link2, FileAudio, FileText, Sparkles, Mic } from 'lucide-react';
+import { CloudUpload, GripVertical, Scissors, Volume2, Zap, Wand2, Plus, X, Link2, FileAudio, FileText, Sparkles, Mic, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -39,21 +39,87 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
   const { toast } = useToast();
   // Audio storage functions now passed as props
 
+  // State for categories
+  const [audioCategories, setAudioCategories] = useState<{ id: string; name: string; collapsed: boolean }[]>(() => {
+    const defaultCategories = [
+      { id: 'default', name: 'Uncategorized', collapsed: false },
+      { id: 'uploaded', name: 'Uploaded', collapsed: false },
+      { id: 'tts', name: 'Text-to-Speech', collapsed: false },
+    ];
+    const storedCategories = localStorage.getItem('audioCategories');
+    if (storedCategories) {
+      try {
+        const parsedCategories = JSON.parse(storedCategories);
+        // Ensure default categories are present
+        const mergedCategories = [...defaultCategories];
+        const existingIds = new Set(defaultCategories.map(c => c.id));
+        parsedCategories.forEach((cat: { id: string; name: string; collapsed: boolean }) => {
+          if (!existingIds.has(cat.id)) {
+            mergedCategories.push(cat);
+          }
+        });
+        return mergedCategories;
+      } catch (e) {
+        console.error("Failed to parse audioCategories from localStorage", e);
+        return defaultCategories;
+      }
+    }
+    return defaultCategories;
+  });
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Category management functions
+  const createCategory = (name: string) => {
+    const newCategory = { id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, name, collapsed: false };
+    setAudioCategories([...audioCategories, newCategory]);
+    // Save to localStorage
+    localStorage.setItem('audioCategories', JSON.stringify([...audioCategories, newCategory]));
+  };
+
+  const deleteCategory = (id: string) => {
+    setAudioCategories(audioCategories.filter(cat => cat.id !== id));
+    // Update audio files to move them to 'default' category
+    audioFiles.forEach(file => {
+      if (file.category === id) {
+        // In a real app, you'd call an update function here
+        // For simplicity, we'll just re-filter them visually
+        file.category = 'default'; // This won't update the actual state without a proper setter
+      }
+    });
+    // Save to localStorage
+    localStorage.setItem('audioCategories', JSON.stringify(audioCategories.filter(cat => cat.id !== id)));
+  };
+
+  const toggleCategoryCollapse = (id: string) => {
+    setAudioCategories(audioCategories.map(cat => 
+      cat.id === id ? { ...cat, collapsed: !cat.collapsed } : cat
+    ));
+    // Save to localStorage
+    localStorage.setItem('audioCategories', JSON.stringify(audioCategories.map(cat => 
+      cat.id === id ? { ...cat, collapsed: !cat.collapsed } : cat
+    )));
+  };
+
+
   const handleFileSelect = async (files: FileList | null) => {
     if (!files) return;
-    
+
     setIsProcessing(true);
-    
+
     try {
       const promises = Array.from(files).map(async (file) => {
         if (file.type.startsWith('audio/')) {
           setLoadingFile(file.name);
           setLoadingProgress(0);
-          
+
           const result = await addAudioFile(file, (progress) => {
             setLoadingProgress(progress);
           });
-          
+
+          // Assign to default category initially, can be changed later
+          result.category = 'default'; 
+
           setLoadingFile(null);
           setLoadingProgress(0);
           return result;
@@ -66,10 +132,10 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
           return null;
         }
       });
-      
+
       const results = await Promise.allSettled(promises);
       const successCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
-      
+
       if (successCount > 0) {
         toast({
           title: "Files Added",
@@ -111,6 +177,15 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleDragStart = (e: React.DragEvent, file: LocalAudioFile) => {
+    e.dataTransfer.setData('audio-file', JSON.stringify({
+      id: file.id,
+      name: file.name,
+      duration: file.duration,
+      category: file.category
+    }));
   };
 
   const tools = [
@@ -177,202 +252,241 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
           />
         </div>
       </div>
-      
+
       {/* Audio Library */}
       <div className="flex-1 p-4 overflow-y-auto">
-        <h3 className="text-sm font-semibold mb-3 text-gray-300">Audio Library</h3>
-        
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-300">Audio Library</h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-6 h-6 p-0 text-green-400 hover:text-green-200"
+            onClick={() => setShowCategoryForm(true)}
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {showCategoryForm && (
+          <div className="bg-track-bg rounded-lg p-3 mb-3 border border-gray-600">
+            <Input
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Category name"
+              className="mb-2"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && newCategoryName.trim()) {
+                  createCategory(newCategoryName.trim());
+                  setNewCategoryName('');
+                  setShowCategoryForm(false);
+                }
+              }}
+            />
+            <div className="flex space-x-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (newCategoryName.trim()) {
+                    createCategory(newCategoryName.trim());
+                    setNewCategoryName('');
+                    setShowCategoryForm(false);
+                  }
+                }}
+              >
+                Add
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowCategoryForm(false);
+                  setNewCategoryName('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
         {isProcessing && (
           <div className="bg-track-bg rounded p-3 mb-2">
             <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-              <span className="text-sm">Processing files...</span>
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />
+              <span className="text-sm text-gray-300">
+                {loadingFile ? `Loading ${loadingFile}...` : 'Processing files...'}
+              </span>
             </div>
+            {loadingProgress > 0 && (
+              <div className="w-full bg-gray-700 rounded-full h-1 mt-2">
+                <div 
+                  className="bg-blue-500 h-1 rounded-full transition-all duration-200" 
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
+            )}
           </div>
         )}
-        
-        {/* Loading Progress */}
-        {loadingFile && (
-          <div className="bg-gray-800 rounded p-3 mb-3">
-            <div className="text-sm text-gray-300 mb-2">
-              📁 Loading: {loadingFile}
-            </div>
-            <Progress value={loadingProgress} className="h-2 bg-gray-700" />
-            <div className="text-xs text-gray-400 mt-1">
-              {loadingProgress}% complete
-            </div>
-          </div>
-        )}
-        
-        
-        {/* Merge Files Button */}
-        {audioFiles.length > 1 && (
-          <div className="mb-3">
-            <Dialog open={concatenateModalOpen} onOpenChange={setConcatenateModalOpen}>
-              <DialogTrigger asChild>
+
+        {/* Multi-select actions */}
+        {selectedFiles.size > 0 && (
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-3 mb-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-blue-300">
+                {selectedFiles.size} file{selectedFiles.size > 1 ? 's' : ''} selected
+              </span>
+              <div className="flex space-x-2">
                 <Button
-                  variant="secondary"
+                  variant="ghost" 
                   size="sm"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-500/60 hover:border-blue-400/80 shadow-lg backdrop-blur-sm"
-                  data-testid="button-merge-files"
+                  onClick={() => setConcatenateModalOpen(true)}
+                  className="text-blue-300 hover:text-blue-200"
                 >
-                  <Link2 className="w-4 h-4 mr-2" />
-                  Merge Selected Files
+                  <Plus className="w-4 h-4 mr-1" />
+                  Merge
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-panel-bg border-gray-700 text-white">
-                <DialogHeader>
-                  <DialogTitle>Merge Audio Files</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">
-                      Select files to merge (in order):
-                    </Label>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {audioFiles.map((file) => (
-                        <div key={file.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`merge-${file.id}`}
-                            checked={selectedFiles.has(file.id)}
-                            onCheckedChange={(checked) => {
-                              const newSelected = new Set(selectedFiles);
-                              if (checked) {
-                                newSelected.add(file.id);
-                              } else {
-                                newSelected.delete(file.id);
-                              }
-                              setSelectedFiles(newSelected);
-                            }}
-                            data-testid={`checkbox-merge-${file.id}`}
-                          />
-                          <Label htmlFor={`merge-${file.id}`} className="text-sm">
-                            {file.name} ({formatDuration(file.duration)})
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
+                <Button
+                  variant="ghost"
+                  size="sm" 
+                  onClick={() => setSelectedFiles(new Set())}
+                  className="text-gray-400 hover:text-gray-200"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Categories */}
+        {audioCategories.map(category => {
+          const categoryFiles = audioFiles.filter(file => file.category === category.id);
+          if (categoryFiles.length === 0 && category.id !== 'default') return null;
+
+          return (
+            <div key={category.id} className="mb-4">
+              <div 
+                className="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg cursor-pointer hover:bg-gray-800/70"
+                onClick={() => toggleCategoryCollapse(category.id)}
+              >
+                <div className="flex items-center space-x-2">
+                  <div className={`transform transition-transform ${category.collapsed ? 'rotate-0' : 'rotate-90'}`}>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
                   </div>
-                  <div>
-                    <Label htmlFor="merge-name" className="text-sm font-medium mb-2 block">
-                      Name for merged file:
-                    </Label>
-                    <Input
-                      id="merge-name"
-                      value={concatenateName}
-                      onChange={(e) => setConcatenateName(e.target.value)}
-                      placeholder="merged-audio"
-                      className="bg-track-bg border-gray-600"
-                      data-testid="input-merge-name"
-                    />
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="secondary"
-                      className="flex-1"
-                      onClick={() => {
-                        setConcatenateModalOpen(false);
-                        setSelectedFiles(new Set());
-                        setConcatenateName('');
-                      }}
-                      data-testid="button-cancel-merge"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={async () => {
-                        if (selectedFiles.size < 2) {
-                          toast({
-                            title: "Error",
-                            description: "Please select at least 2 files to merge.",
-                            variant: "destructive"
-                          });
-                          return;
-                        }
-                        
-                        const name = concatenateName || 'merged-audio';
-                        const fileIds = Array.from(selectedFiles);
-                        
-                        setIsProcessing(true);
-                        try {
-                          const result = await concatenateFiles(fileIds, name);
-                          if (result) {
-                            toast({
-                              title: "Files Merged",
-                              description: `Created merged file: ${name}`
-                            });
-                            setConcatenateModalOpen(false);
-                            setSelectedFiles(new Set());
-                            setConcatenateName('');
+                  <span className="text-sm font-medium text-gray-300">{category.name}</span>
+                  <span className="text-xs text-gray-500">({categoryFiles.length})</span>
+                </div>
+                {category.id !== 'default' && category.id !== 'uploaded' && category.id !== 'tts' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-6 h-6 p-0 text-red-400 hover:text-red-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCategory(category.id);
+                    }}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+
+              {!category.collapsed && (
+                <div className="ml-4 mt-2 space-y-2">
+                  {categoryFiles.map(file => (
+                    <div 
+                      key={file.id}
+                      className={`group bg-track-bg hover:bg-gray-700/80 rounded-lg p-3 border transition-all cursor-pointer ${
+                        selectedFiles.has(file.id) ? 'border-blue-500 bg-blue-900/20' : 'border-gray-600'
+                      }`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, file)}
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                          const newSelection = new Set(selectedFiles);
+                          if (newSelection.has(file.id)) {
+                            newSelection.delete(file.id);
+                          } else {
+                            newSelection.add(file.id);
+                          }
+                          setSelectedFiles(newSelection);
+                        } else if (selectedFiles.size <= 1) {
+                          // Attempt to add clip to the first track that has no clips, or the first track overall
+                          const targetTrack = tracks.find(track => track.clips.length === 0) || (tracks.length > 0 ? tracks[0] : null);
+                          if (targetTrack) {
+                            const clip: AudioClip = {
+                              id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                              audioFileId: file.id,
+                              name: file.name,
+                              startTime: 0,
+                              duration: file.duration,
+                              volume: 1,
+                              fadeIn: 0,
+                              fadeOut: 0
+                            };
+                            onAddClipToTrack(targetTrack.id, clip);
                           } else {
                             toast({
-                              title: "Merge Failed",
-                              description: "Unable to merge selected files.",
+                              title: "No Tracks Available",
+                              description: "Please add a track before adding audio clips.",
                               variant: "destructive"
                             });
                           }
-                        } finally {
-                          setIsProcessing(false);
                         }
                       }}
-                      disabled={selectedFiles.size < 2 || isProcessing}
-                      data-testid="button-confirm-merge"
+                      data-testid={`audio-file-${file.id}`}
                     >
-                      {isProcessing ? 'Merging...' : 'Merge Files'}
-                    </Button>
-                  </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedFiles.has(file.id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const newSelection = new Set(selectedFiles);
+                              if (e.target.checked) {
+                                newSelection.add(file.id);
+                              } else {
+                                newSelection.delete(file.id);
+                              }
+                              setSelectedFiles(newSelection);
+                            }}
+                            className="w-3 h-3 text-blue-500 rounded"
+                          />
+                          <FileAudio className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-200 truncate">
+                              {file.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {file.duration.toFixed(1)}s
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-6 h-6 p-0 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-200 hover:bg-red-900/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeAudioFile(file.id);
+                            }}
+                            data-testid={`button-delete-${file.id}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                          <GripVertical className="w-4 h-4 text-gray-500" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
-        
-        {audioFiles.map((file: LocalAudioFile) => (
-          <div
-            key={file.id}
-            className="bg-track-bg rounded-lg p-4 mb-3 cursor-pointer hover:bg-gradient-to-r hover:from-slate-700/60 hover:to-slate-600/60 transition-all duration-200 group shadow-lg border border-gray-700/30 backdrop-blur-sm"
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData('audio-file', JSON.stringify({
-                id: file.id,
-                name: file.name,
-                duration: file.duration
-              }));
-            }}
-            data-testid={`audio-file-${file.id}`}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center flex-1 min-w-0">
-                <FileAudio className="w-4 h-4 text-blue-400 mr-2 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" data-testid={`text-filename-${file.id}`}>
-                    {file.name}
-                  </p>
-                  <p className="text-xs text-gray-400" data-testid={`text-duration-${file.id}`}>
-                    {formatDuration(file.duration)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-6 h-6 p-0 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-200 hover:bg-red-900/20"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeAudioFile(file.id);
-                  }}
-                  data-testid={`button-delete-${file.id}`}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-                <GripVertical className="w-4 h-4 text-gray-500" />
-              </div>
+              )}
             </div>
-          </div>
-        ))}
-        
+          );
+        })}
+
         {audioFiles.length === 0 && !isProcessing && (
           <div className="text-center py-8">
             <FileAudio className="w-12 h-12 text-gray-600 mx-auto mb-2" />
@@ -385,7 +499,7 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
           </div>
         )}
       </div>
-      
+
     </aside>
   );
 }

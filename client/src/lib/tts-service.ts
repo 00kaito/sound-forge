@@ -7,8 +7,8 @@ const getOpenAIClient = () => {
   if (!apiKey) {
     throw new Error("OpenAI API key nie został skonfigurowany. Sprawdź ustawienia środowiska.");
   }
-  
-  return new OpenAI({ 
+
+  return new OpenAI({
     apiKey,
     dangerouslyAllowBrowser: true
   });
@@ -26,7 +26,7 @@ export class TTSService {
     },
     {
       id: "echo",
-      name: "Echo", 
+      name: "Echo",
       description: "Męski, ciepły głos",
       gender: "male",
       language: "en-US"
@@ -35,7 +35,7 @@ export class TTSService {
       id: "fable",
       name: "Fable",
       description: "Brytyjski akcent, męski",
-      gender: "male", 
+      gender: "male",
       language: "en-GB"
     },
     {
@@ -90,7 +90,7 @@ export class TTSService {
 
       const arrayBuffer = await response.arrayBuffer();
       const audioBlob = new Blob([arrayBuffer], { type: "audio/mp3" });
-      
+
       // Estimate duration based on text length (rough estimate: ~150 words per minute)
       const wordCount = fragment.text.split(' ').length;
       const estimatedDuration = (wordCount / 150) * 60; // seconds
@@ -115,26 +115,26 @@ export class TTSService {
     onProgress?: (completedCount: number, totalCount: number) => void
   ): Promise<TTSGenerationResult[]> {
     const results: TTSGenerationResult[] = [];
-    
+
     for (let i = 0; i < fragments.length; i++) {
       const fragment = fragments[i];
       const voice = voices.find(v => v.id === fragment.voiceId);
-      
+
       if (!voice) {
         throw new Error(`Nie znaleziono głosu o ID: ${fragment.voiceId}`);
       }
 
       const result = await this.generateAudioForFragment(fragment, voice);
       results.push(result);
-      
+
       onProgress?.(i + 1, fragments.length);
-      
+
       // Small delay to avoid rate limiting
       if (i < fragments.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
-    
+
     return results;
   }
 
@@ -162,14 +162,14 @@ export class TTSService {
    */
   static groupFragmentsByVoice(fragments: TTSTextFragment[]): Map<string, TTSTextFragment[]> {
     const groupedFragments = new Map<string, TTSTextFragment[]>();
-    
+
     for (const fragment of fragments) {
       if (!groupedFragments.has(fragment.voiceId)) {
         groupedFragments.set(fragment.voiceId, []);
       }
       groupedFragments.get(fragment.voiceId)!.push(fragment);
     }
-    
+
     return groupedFragments;
   }
 }
