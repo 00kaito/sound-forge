@@ -417,6 +417,36 @@ export default function AudioEditor() {
     })));
   };
 
+  const handleClipMove = (clipId: string, newStartTime: number) => {
+    updateClip(clipId, { startTime: newStartTime });
+  };
+
+  const handleClipResize = (clipId: string, newDuration: number) => {
+    updateClip(clipId, { duration: newDuration });
+  };
+
+  const handleTrackVolumeChange = (trackId: string, volume: number) => {
+    updateTrack(trackId, { volume });
+  };
+
+  const handleTrackPanChange = (trackId: string, pan: number) => {
+    updateTrack(trackId, { pan });
+  };
+
+  const handleTrackMuteToggle = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (track) {
+      updateTrack(trackId, { muted: !track.muted });
+    }
+  };
+
+  const handleTrackSoloToggle = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (track) {
+      updateTrack(trackId, { solo: !track.solo });
+    }
+  };
+
   // Split clip at a specific time (for cut tool)
   const splitClip = (clipId: string, splitTime: number) => {
     // Save state before splitting for undo
