@@ -68,21 +68,33 @@ export function Timeline({
   getAudioBuffer,
   onTrackDelete
 }: TimelineProps) {
-  const timelineRef = useRef<HTMLCanvasElement>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
 
   // Mouse cursor position tracking
-  const [mousePosition, setMousePosition] = useState<number | null>(null);
   const [tracksCursorPosition, setTracksCursorPosition] = useState<number | null>(null);
 
-  // Use zoomLevel from projectData or default to 25%
-  const zoomLevel = projectData.zoomLevel || 25;
+  // Use zoomLevel from projectData or default to 100%
+  const zoomLevel = projectData.zoomLevel || 100;
 
-  // Calculate pixels per second based on new scale: 100% = 5 minutes visible
-  // If screen is ~1600px wide, then 100% should show 300s (5min)
-  // So base rate = 1600/300 ≈ 5.33 pixels per second at 100%
-  const basePixelsPerSecond = 5.33; // This makes 100% = ~5min on typical screen
-  const pixelsPerSecond = basePixelsPerSecond * (zoomLevel / 100);
+  // Calculate content-based pixels per second
+  // 100% = all loaded audio content fits in available timeline width
+  const calculatePixelsPerSecond = () => {
+    const allClips = tracks.flatMap(track => track.clips);
+    const maxContentTime = allClips.length > 0 
+      ? Math.max(...allClips.map(clip => clip.startTime + clip.duration))
+      : 300; // Default 5 minutes if no content
+    
+    // Get actual timeline area width (not the whole container)
+    const timelineArea = timelineContainerRef.current?.querySelector('.flex-1.overflow-x-auto') as HTMLElement;
+    const availableWidth = timelineArea?.clientWidth || 1200;
+    
+    // Calculate base pixels per second for 100% (content fits in view)
+    const basePixelsPerSecond = (availableWidth - 100) / maxContentTime; // 100px padding
+    
+    return basePixelsPerSecond * (zoomLevel / 100);
+  };
+  
+  const pixelsPerSecond = calculatePixelsPerSecond();
 
   // Mouse drag state for zooming
   const [isDragging, setIsDragging] = useState(false);
@@ -96,23 +108,6 @@ export function Timeline({
     onUpdateProjectData?.({ zoomLevel: clampedZoom });
   };
 
-  // Handle timeline clicking for scrubbing
-  const handleTimelineClick = (e: React.MouseEvent) => {
-    if (!onSeekTo || isDragging) return;
-
-    const timelineElement = e.currentTarget;
-    const rect = timelineElement.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const timePosition = clickX / pixelsPerSecond;
-
-    // Ensure we don't seek beyond available content
-    const maxTime = Math.max(0, ...tracks.flatMap(track => 
-      track.clips.map(clip => clip.startTime + clip.duration)
-    ));
-
-    const clampedTime = Math.max(0, Math.min(timePosition, maxTime));
-    onSeekTo(clampedTime);
-  };
 
   const handleZoomIn = () => {
     updateZoom(zoomLevel * 1.5);
@@ -132,52 +127,12 @@ export function Timeline({
     // Find all clips from all tracks
     const allClips = tracks.flatMap(track => track.clips);
     if (allClips.length === 0) {
-      updateZoom(25);
+      updateZoom(100);
       return;
     }
 
-    // Find the furthest end time across all tracks
-    const maxEndTime = Math.max(...allClips.map(clip => clip.startTime + clip.duration));
-
-    // Get the actual timeline area width (not the whole container)
-    const timelineArea = timelineContainerRef.current?.querySelector('.flex-1.overflow-x-auto') as HTMLElement;
-    const availableWidth = timelineArea?.clientWidth || 800;
-
-    // Check if content already fits at current zoom level
-    const currentContentWidth = maxEndTime * pixelsPerSecond;
-    const contentFitsOnScreen = currentContentWidth <= availableWidth;
-
-    if (contentFitsOnScreen) {
-      // Content already fits, don't zoom out - try to zoom in instead
-
-      // Calculate maximum zoom where content still fits
-      const maxPixelsPerSecond = availableWidth / maxEndTime;
-      const maxZoomForFit = (maxPixelsPerSecond / basePixelsPerSecond) * 100;
-      const targetZoom = Math.min(1500, maxZoomForFit * 0.9); // 90% of max to leave some padding
-
-      // Only zoom in if it would be significantly higher than current
-      if (targetZoom > zoomLevel * 1.2) {
-        updateZoom(targetZoom);
-      }
-      return;
-    }
-
-    // Content doesn't fit, calculate optimal zoom to fit
-    const paddedWidth = availableWidth - 100; // 100px padding
-    const targetPixelsPerSecond = paddedWidth / maxEndTime;
-
-    // Convert to zoom percentage using new base scale
-    const calculatedZoom = (targetPixelsPerSecond / basePixelsPerSecond) * 100;
-
-    // For very long audio, allow extremely low zoom to fit everything
-    let minZoom = 10; // Default minimum
-    if (maxEndTime > 1800) minZoom = 0.5; // 30+ min: 0.5%
-    if (maxEndTime > 3600) minZoom = 0.2; // 1+ hour: 0.2%  
-    if (maxEndTime > 7200) minZoom = 0.1; // 2+ hours: 0.1%
-    if (maxEndTime > 10800) minZoom = 0.05; // 3+ hours: 0.05%
-
-    const newZoom = Math.max(minZoom, Math.min(1500, calculatedZoom));
-    updateZoom(newZoom);
+    // Auto-fit always sets to 100% (content fits in view)
+    updateZoom(100);
   };
 
   // Mouse drag zoom handlers
@@ -273,103 +228,6 @@ export function Timeline({
     }
   };
 
-  const renderTimelineRuler = () => {
-    if (!timelineRef.current) return;
-
-    const canvas = timelineRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-
-    // Clear canvas
-    ctx.fillStyle = '#2d2d30';
-    ctx.fillRect(0, 0, width, height);
-
-    // Draw time markers with improved scaling
-    ctx.fillStyle = '#ffffff';
-
-    // Calculate appropriate time interval and font size based on zoom level
-    // Adjusted for new scale where 100% = 5min visible
-    let timeInterval = 1;
-    let fontSize = 10;
-    let minSpacing = 80; // Minimum pixels between labels to avoid overlap
-
-    if (pixelsPerSecond > 20) {
-      timeInterval = 5; // Every 5s when very zoomed in
-      fontSize = 10;
-      minSpacing = 60;
-    } else if (pixelsPerSecond > 10) {
-      timeInterval = 10; // Every 10s when zoomed in
-      fontSize = 10;
-      minSpacing = 70;
-    } else if (pixelsPerSecond > 5) {
-      timeInterval = 30; // Every 30s at normal zoom
-      fontSize = 10;
-      minSpacing = 80;
-    } else if (pixelsPerSecond > 2) {
-      timeInterval = 60; // Every 1min when zoomed out
-      fontSize = 10;
-      minSpacing = 90;
-    } else if (pixelsPerSecond > 1) {
-      timeInterval = 120; // Every 2min when very zoomed out
-      fontSize = 10;
-      minSpacing = 100;
-    } else if (pixelsPerSecond > 0.5) {
-      timeInterval = 300; // Every 5min when extremely zoomed out
-      fontSize = 10;
-      minSpacing = 120;
-    } else if (pixelsPerSecond > 0.2) {
-      timeInterval = 600; // Every 10min when ultra zoomed out
-      fontSize = 9;
-      minSpacing = 150;
-    } else if (pixelsPerSecond > 0.1) {
-      timeInterval = 900; // Every 15min for very long audio
-      fontSize = 9;
-      minSpacing = 180;
-    } else {
-      timeInterval = 1800; // Every 30min for 3+ hour audio
-      fontSize = 9;
-      minSpacing = 200;
-    }
-
-    ctx.font = `${fontSize}px Inter`;
-
-    let lastLabelX = -minSpacing; // Track last label position to prevent overlap
-
-    // Calculate actual audio duration from all clips
-    const allClips = tracks.flatMap(track => track.clips);
-    const maxAudioTime = allClips.length > 0 
-      ? Math.max(...allClips.map(clip => clip.startTime + clip.duration))
-      : 60; // Default 60s if no clips
-
-    // Use actual audio duration instead of canvas width
-    const maxTimeToRender = Math.max(maxAudioTime, width / pixelsPerSecond);
-
-    for (let time = 0; time < maxTimeToRender; time += timeInterval) {
-      const x = time * pixelsPerSecond;
-
-      // Draw tick mark
-      ctx.fillRect(x, height - 10, 1, 10);
-
-      // Draw time label only if there's enough space
-      if (x > 20 && x - lastLabelX >= minSpacing) {
-        const timeText = formatTime(time);
-        const textWidth = ctx.measureText(timeText).width;
-
-        // Only draw if it fits without overlap
-        if (x + textWidth + 4 < width) {
-          ctx.fillText(timeText, x + 2, height - 15);
-          lastLabelX = x;
-        }
-      }
-    }
-  };
-
-  useEffect(() => {
-    renderTimelineRuler();
-  }, [pixelsPerSecond, formatTime, tracks]);
 
   const playheadPosition = playbackState.currentTime * pixelsPerSecond;
 
@@ -490,46 +348,11 @@ export function Timeline({
       </div>
 
       {/* Timeline Header */}
-      <div className="panel-bg border-b border-gray-700 h-12 flex items-center">
+      <div className="panel-bg border-b border-gray-700 h-8 flex items-center">
         <div className="w-48 px-4 border-r border-gray-700 h-full flex items-center">
           <span className="text-sm font-medium text-gray-300">Tracks</span>
         </div>
-
-        {/* Timeline Ruler */}
-        <div className="flex-1 relative h-full">
-          <canvas
-            ref={timelineRef}
-            className="w-full h-full cursor-pointer"
-            width={800}
-            height={48}
-            onClick={handleTimelineClick}
-            onMouseMove={(e) => {
-              // Calculate time position for timeline ruler
-              const rect = e.currentTarget.getBoundingClientRect();
-              const mouseX = e.clientX - rect.left;
-              const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
-              setMousePosition(timeAtCursor);
-
-              // Update tracks cursor position based on audio time
-              setTracksCursorPosition(timeAtCursor * pixelsPerSecond);
-            }}
-            onMouseLeave={() => {
-              setMousePosition(null);
-              setTracksCursorPosition(null);
-            }}
-            data-testid="canvas-timeline-ruler"
-            title="Click to seek to position"
-          />
-
-          {/* Cursor Time Display - positioned on timeline ruler */}
-          {mousePosition !== null && (
-            <div className="absolute top-1 left-2 bg-gray-900 text-white px-2 py-1 rounded text-xs font-mono border border-gray-500 pointer-events-none z-20 shadow-lg">
-              {formatTime(mousePosition)}
-            </div>
-          )}
-
-        </div>
-
+        <div className="flex-1 h-full bg-editor-bg"></div>
       </div>
 
       {/* Tracks Container */}
@@ -573,18 +396,13 @@ export function Timeline({
             currentTool === 'cut' ? 'cut-tool-active' : 'cursor-default'
           }`}
           onMouseMove={(e) => {
-            // Calculate mouse position once and use for both systems
+            // Calculate mouse position for cursor line
             const rect = e.currentTarget.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const timeAtCursor = Math.max(0, mouseX / pixelsPerSecond);
-
-            // Update time position (used for tooltip and cursor line calculation)
-            setMousePosition(timeAtCursor);
-            // Cursor line position will be calculated from time, not pixels
             setTracksCursorPosition(timeAtCursor * pixelsPerSecond);
           }}
           onMouseLeave={() => {
-            setMousePosition(null);
             setTracksCursorPosition(null);
           }}
           onWheel={handleWheel}
