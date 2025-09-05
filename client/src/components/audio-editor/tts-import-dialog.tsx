@@ -26,34 +26,84 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   const [isAlternatingVoices, setIsAlternatingVoices] = useState<boolean>(false);
   const [alternatingVoice1, setAlternatingVoice1] = useState<string>("");
   const [alternatingVoice2, setAlternatingVoice2] = useState<string>("");
+  const [isDialogMode, setIsDialogMode] = useState<boolean>(false);
+  const [speakerVoiceMapping, setSpeakerVoiceMapping] = useState<Map<string, string>>(new Map());
+  const [detectedSpeakers, setDetectedSpeakers] = useState<string[]>([]);
   const dialogId = useId();
 
   const availableVoices = TTSService.AVAILABLE_VOICES;
+
+  // Parse dialog format (name: text)
+  const parseDialogText = (text: string): { speakers: string[], fragments: TTSTextFragment[] } => {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const speakers = new Set<string>();
+    const parsedFragments: TTSTextFragment[] = [];
+    
+    lines.forEach((line, index) => {
+      const match = line.match(/^([^:]+):\s*(.+)$/);
+      if (match) {
+        const [, speaker, text] = match;
+        const speakerName = speaker.trim();
+        const speechText = text.trim();
+        
+        speakers.add(speakerName);
+        
+        // Get voice for this speaker (default to first voice if not mapped)
+        const voiceId = speakerVoiceMapping.get(speakerName) || availableVoices[0].id;
+        
+        parsedFragments.push({
+          id: `fragment-${index + 1}`,
+          text: speechText, // Only the speech text, not the speaker name
+          voiceId,
+          order: index,
+          speaker: speakerName // Store speaker name for reference
+        });
+      }
+    });
+    
+    return {
+      speakers: Array.from(speakers),
+      fragments: parsedFragments
+    };
+  };
 
   // Parse text into fragments when text changes
   const handleTextChange = (text: string) => {
     setRawText(text);
     
     if (text.trim()) {
-      const textLines = TTSService.parseTextToFragments(text);
-      const newFragments: TTSTextFragment[] = textLines.map((line, index) => {
-        let voiceId = availableVoices[0].id; // Default to first voice
-        
-        // Apply alternating voices if enabled
-        if (isAlternatingVoices && alternatingVoice1 && alternatingVoice2) {
-          voiceId = index % 2 === 0 ? alternatingVoice1 : alternatingVoice2;
-        }
-        
-        return {
-          id: `fragment-${index + 1}`,
-          text: line,
-          voiceId,
-          order: index
-        };
-      });
-      setFragments(newFragments);
+      // Check if text looks like dialog format (contains lines with "name:")
+      const hasDialogFormat = text.split('\n').some(line => /^[^:]+:\s*.+$/.test(line.trim()));
+      
+      if (hasDialogFormat && isDialogMode) {
+        // Parse as dialog
+        const { speakers, fragments: dialogFragments } = parseDialogText(text);
+        setDetectedSpeakers(speakers);
+        setFragments(dialogFragments);
+      } else {
+        // Parse as regular text
+        const textLines = TTSService.parseTextToFragments(text);
+        const newFragments: TTSTextFragment[] = textLines.map((line, index) => {
+          let voiceId = availableVoices[0].id; // Default to first voice
+          
+          // Apply alternating voices if enabled
+          if (isAlternatingVoices && alternatingVoice1 && alternatingVoice2) {
+            voiceId = index % 2 === 0 ? alternatingVoice1 : alternatingVoice2;
+          }
+          
+          return {
+            id: `fragment-${index + 1}`,
+            text: line,
+            voiceId,
+            order: index
+          };
+        });
+        setFragments(newFragments);
+        setDetectedSpeakers([]);
+      }
     } else {
       setFragments([]);
+      setDetectedSpeakers([]);
     }
   };
 
@@ -82,6 +132,25 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
       }));
       setFragments(updatedFragments);
     }
+  };
+
+  // Update voice mapping for a speaker
+  const updateSpeakerVoice = (speakerName: string, voiceId: string) => {
+    const newMapping = new Map(speakerVoiceMapping);
+    newMapping.set(speakerName, voiceId);
+    setSpeakerVoiceMapping(newMapping);
+    
+    // Update all fragments for this speaker
+    setFragments(prev => prev.map(fragment => 
+      fragment.speaker === speakerName 
+        ? { ...fragment, voiceId }
+        : fragment
+    ));
+    
+    // Track which voices are being used
+    const updatedVoices = new Set(selectedVoices);
+    updatedVoices.add(voiceId);
+    setSelectedVoices(updatedVoices);
   };
 
   // Change all fragments of one voice to another
@@ -199,6 +268,9 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     setSelectedVoices(new Set());
     setSelectedFragments(new Set());
     setBulkVoiceId("");
+    setIsDialogMode(false);
+    setSpeakerVoiceMapping(new Map());
+    setDetectedSpeakers([]);
   };
 
   // Estimate total duration
@@ -224,7 +296,10 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             </Label>
             <Textarea
               id={`${dialogId}-text`}
-              placeholder="Wprowadź tekst dialogu...&#10;Każda linia będzie osobnym fragmentem audio.&#10;Przykład:&#10;Witaj w naszym podcaście!&#10;Dzisiaj rozmawiamy o AI.&#10;To będzie fascynujący temat."
+              placeholder={isDialogMode ? 
+                "Wprowadź dialog w formacie:&#10;Imię: tekst wypowiedzi&#10;Przykład:&#10;Anna: Witaj w naszym podcaście!&#10;Marek: Dzisiaj rozmawiamy o AI.&#10;Anna: To będzie fascynujący temat." :
+                "Wprowadź tekst dialogu...&#10;Każda linia będzie osobnym fragmentem audio.&#10;Przykład:&#10;Witaj w naszym podcaście!&#10;Dzisiaj rozmawiamy o AI.&#10;To będzie fascynujący temat."
+              }
               value={rawText}
               onChange={(e) => handleTextChange(e.target.value)}
               className="min-h-32"
@@ -239,19 +314,86 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             </p>
           </div>
 
-          {/* Alternating Voices Option */}
+          {/* Dialog Mode Toggle */}
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="alternating-voices"
-                checked={isAlternatingVoices}
-                onCheckedChange={(checked) => handleAlternatingModeChange(!!checked)}
-                data-testid="checkbox-alternating-voices"
+                id="dialog-mode"
+                checked={isDialogMode}
+                onCheckedChange={(checked) => {
+                  setIsDialogMode(!!checked);
+                  if (checked) {
+                    setIsAlternatingVoices(false); // Disable alternating voices when dialog mode is enabled
+                  }
+                  // Re-parse text with new mode
+                  if (rawText.trim()) {
+                    handleTextChange(rawText);
+                  }
+                }}
+                data-testid="checkbox-dialog-mode"
               />
-              <Label htmlFor="alternating-voices" className="text-sm font-medium">
-                Głosy naprzemienne (dialog dwuosobowy)
+              <Label htmlFor="dialog-mode" className="text-sm font-medium">
+                Tryb dialogu (format: imię: tekst)
               </Label>
             </div>
+
+            {/* Speaker Voice Assignment */}
+            {isDialogMode && detectedSpeakers.length > 0 && (
+              <Card className="p-3 bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800">
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Przypisz głosy do mówców ({detectedSpeakers.length} wykrytych)
+                  </Label>
+                  <div className="grid gap-3">
+                    {detectedSpeakers.map(speaker => (
+                      <div key={speaker} className="flex items-center gap-2">
+                        <Badge variant="outline" className="min-w-fit">
+                          {speaker}
+                        </Badge>
+                        <Select
+                          value={speakerVoiceMapping.get(speaker) || ""}
+                          onValueChange={(voiceId) => updateSpeakerVoice(speaker, voiceId)}
+                        >
+                          <SelectTrigger className="flex-1" data-testid={`select-speaker-voice-${speaker}`}>
+                            <SelectValue placeholder="Wybierz głos..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableVoices.map(voice => (
+                              <SelectItem key={voice.id} value={voice.id}>
+                                <div className="flex items-center gap-2">
+                                  <User className="w-3 h-3" />
+                                  <span>{voice.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {voice.gender}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+
+          {/* Alternating Voices Option - only show when dialog mode is off */}
+          {!isDialogMode && (
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="alternating-voices"
+                  checked={isAlternatingVoices}
+                  onCheckedChange={(checked) => handleAlternatingModeChange(!!checked)}
+                  data-testid="checkbox-alternating-voices"
+                />
+                <Label htmlFor="alternating-voices" className="text-sm font-medium">
+                  Głosy naprzemienne (dialog dwuosobowy)
+                </Label>
+              </div>
             
             {isAlternatingVoices && (
               <Card className="p-3 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
@@ -410,6 +552,13 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         </div>
                         
                         <div className="flex-1 space-y-2">
+                          {fragment.speaker && (
+                            <div className="flex items-center gap-1 mb-1">
+                              <Badge variant="secondary" className="text-xs">
+                                {fragment.speaker}
+                              </Badge>
+                            </div>
+                          )}
                           <p className="text-sm">{fragment.text}</p>
                           
                           <div className="flex items-center gap-2 flex-wrap">
