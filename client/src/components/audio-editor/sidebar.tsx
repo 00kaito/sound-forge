@@ -42,9 +42,9 @@ export function Sidebar({ tracks, onAddTrack, onAddClipToTrack, currentTool, onT
   // State for categories
   const [audioCategories, setAudioCategories] = useState<{ id: string; name: string; collapsed: boolean }[]>(() => {
     const defaultCategories = [
-      { id: 'default', name: 'Uncategorized', collapsed: false },
+      { id: 'default', name: 'Uploaded', collapsed: false },
       { id: 'uploaded', name: 'Uploaded', collapsed: false },
-      { id: 'tts', name: 'Text-to-Speech', collapsed: false },
+      { id: 'tts', name: 'Generated', collapsed: false },
     ];
     const storedCategories = localStorage.getItem('audioCategories');
     if (storedCategories) {

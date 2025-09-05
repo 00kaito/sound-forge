@@ -6,8 +6,8 @@ export function useLocalAudioStorage() {
   const [audioFiles, setAudioFiles] = useState<LocalAudioFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [audioCategories, setAudioCategories] = useState<AudioCategory[]>([
-    { id: 'default', name: 'Uncategorized', collapsed: false, fileIds: [] },
-    { id: 'tts', name: 'Generated Audio', collapsed: false, fileIds: [] },
+    { id: 'default', name: 'Uploaded', collapsed: false, fileIds: [] },
+    { id: 'tts', name: 'Generated', collapsed: false, fileIds: [] },
     { id: 'uploaded', name: 'Uploaded Files', collapsed: false, fileIds: [] }
   ]);
   console.log('LocalAudioStorage initialized with files:', audioFiles.map(f => ({ id: f.id, name: f.name, hasBuffer: !!f.audioBuffer })));
