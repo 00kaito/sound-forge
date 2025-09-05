@@ -38,19 +38,19 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const speakers = new Set<string>();
     const parsedFragments: TTSTextFragment[] = [];
-    
+
     lines.forEach((line, index) => {
       const match = line.match(/^([^:]+):\s*(.+)$/);
       if (match) {
         const [, speaker, text] = match;
         const speakerName = speaker.trim();
         const speechText = text.trim();
-        
+
         speakers.add(speakerName);
-        
+
         // Get voice for this speaker (default to first voice if not mapped)
         const voiceId = speakerVoiceMapping.get(speakerName) || availableVoices[0].id;
-        
+
         parsedFragments.push({
           id: `fragment-${index + 1}`,
           text: speechText, // Only the speech text, not the speaker name
@@ -60,7 +60,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         });
       }
     });
-    
+
     return {
       speakers: Array.from(speakers),
       fragments: parsedFragments
@@ -70,11 +70,11 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   // Parse text into fragments when text changes
   const handleTextChange = (text: string) => {
     setRawText(text);
-    
+
     if (text.trim()) {
       // Check if text looks like dialog format (contains lines with "name:")
       const hasDialogFormat = text.split('\n').some(line => /^[^:]+:\s*.+$/.test(line.trim()));
-      
+
       if (hasDialogFormat && isDialogMode) {
         // Parse as dialog
         const { speakers, fragments: dialogFragments } = parseDialogText(text);
@@ -85,12 +85,12 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         const textLines = TTSService.parseTextToFragments(text);
         const newFragments: TTSTextFragment[] = textLines.map((line, index) => {
           let voiceId = availableVoices[0].id; // Default to first voice
-          
+
           // Apply alternating voices if enabled
           if (isAlternatingVoices && alternatingVoice1 && alternatingVoice2) {
             voiceId = index % 2 === 0 ? alternatingVoice1 : alternatingVoice2;
           }
-          
+
           return {
             id: `fragment-${index + 1}`,
             text: line,
@@ -110,7 +110,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   // Re-apply voice assignment when alternating mode changes
   const handleAlternatingModeChange = (enabled: boolean) => {
     setIsAlternatingVoices(enabled);
-    
+
     if (enabled && alternatingVoice1 && alternatingVoice2 && fragments.length > 0) {
       const updatedFragments = fragments.map((fragment, index) => ({
         ...fragment,
@@ -124,7 +124,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   const handleAlternatingVoicesUpdate = (voice1: string, voice2: string) => {
     setAlternatingVoice1(voice1);
     setAlternatingVoice2(voice2);
-    
+
     if (isAlternatingVoices && voice1 && voice2 && fragments.length > 0) {
       const updatedFragments = fragments.map((fragment, index) => ({
         ...fragment,
@@ -139,14 +139,14 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     const newMapping = new Map(speakerVoiceMapping);
     newMapping.set(speakerName, voiceId);
     setSpeakerVoiceMapping(newMapping);
-    
+
     // Update all fragments for this speaker
     setFragments(prev => prev.map(fragment => 
       fragment.speaker === speakerName 
         ? { ...fragment, voiceId }
         : fragment
     ));
-    
+
     // Track which voices are being used
     const updatedVoices = new Set(selectedVoices);
     updatedVoices.add(voiceId);
@@ -160,7 +160,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         ? { ...fragment, voiceId: toVoiceId }
         : fragment
     ));
-    
+
     // Track which voices are being used
     const updatedVoices = new Set(selectedVoices);
     updatedVoices.add(toVoiceId);
@@ -174,7 +174,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         ? { ...fragment, voiceId }
         : fragment
     ));
-    
+
     // Track which voices are being used
     const updatedVoices = new Set(selectedVoices);
     updatedVoices.add(voiceId);
@@ -218,18 +218,18 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   // Apply voice to selected fragments
   const applyBulkVoice = () => {
     if (!bulkVoiceId || selectedFragments.size === 0) return;
-    
+
     setFragments(prev => prev.map(fragment => 
       selectedFragments.has(fragment.id)
         ? { ...fragment, voiceId: bulkVoiceId }
         : fragment
     ));
-    
+
     // Track which voices are being used
     const updatedVoices = new Set(selectedVoices);
     updatedVoices.add(bulkVoiceId);
     setSelectedVoices(updatedVoices);
-    
+
     // Clear selection after applying
     setSelectedFragments(new Set());
   };
@@ -257,11 +257,11 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   // Handle import
   const handleImport = () => {
     if (fragments.length === 0) return;
-    
+
     const usedVoices = getUsedVoices();
     onImport(fragments, usedVoices);
     onClose();
-    
+
     // Reset form
     setRawText("");
     setFragments([]);
@@ -287,7 +287,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         <DialogHeader>
           <DialogTitle>Import tekstu do generowania audio</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Text Input */}
           <div className="space-y-2">
@@ -394,7 +394,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                   Głosy naprzemienne (dialog dwuosobowy)
                 </Label>
               </div>
-            
+
             {isAlternatingVoices && (
               <Card className="p-3 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
                 <div className="space-y-3">
@@ -424,7 +424,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div>
                       <Label className="text-xs text-muted-foreground">Głos 2 (parzyste linie)</Label>
                       <Select 
@@ -480,7 +480,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                       Zaznaczono: {selectedFragments.size} fragmentów
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button
                       variant="outline"
@@ -500,7 +500,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         </>
                       )}
                     </Button>
-                    
+
                     <Select value={bulkVoiceId} onValueChange={setBulkVoiceId}>
                       <SelectTrigger className="w-48" data-testid="select-bulk-voice">
                         <SelectValue placeholder="Wybierz głos..." />
@@ -519,7 +519,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         ))}
                       </SelectContent>
                     </Select>
-                    
+
                     <Button
                       variant="default"
                       size="sm"
@@ -550,7 +550,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                             {index + 1}
                           </Badge>
                         </div>
-                        
+
                         <div className="flex-1 space-y-2">
                           {fragment.speaker && (
                             <div className="flex items-center gap-1 mb-1">
@@ -560,7 +560,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                             </div>
                           )}
                           <p className="text-sm">{fragment.text}</p>
-                          
+
                           <div className="flex items-center gap-2 flex-wrap">
                             <Select 
                               value={fragment.voiceId} 
@@ -583,7 +583,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                                 ))}
                               </SelectContent>
                             </Select>
-                            
+
                             <Button
                               variant="outline"
                               size="sm"
@@ -598,7 +598,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                             >
                               Zmień wszystkie
                             </Button>
-                            
+
                             {voice && (
                               <span className="text-xs text-muted-foreground">
                                 {voice.description}
@@ -628,7 +628,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                   {Object.entries(fragmentsByVoice).map(([voiceId, voiceFragments]) => {
                     const voice = getVoiceById(voiceId);
                     if (!voice) return null;
-                    
+
                     return (
                       <Card key={voiceId} className="p-3 bg-muted/50">
                         <div className="flex items-center justify-between">
@@ -657,7 +657,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             <Button variant="outline" onClick={onClose} data-testid="button-cancel">
               Anuluj
             </Button>
-            
+
             <Button 
               onClick={handleImport}
               disabled={fragments.length === 0}
