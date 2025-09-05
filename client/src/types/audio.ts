@@ -76,7 +76,6 @@ export interface TTSTextFragment {
   text: string;
   voiceId: string;
   order: number;
-  speaker?: string; // Optional speaker name for dialog mode
 }
 
 export interface TTSProject {
