@@ -542,10 +542,10 @@ export function Timeline({
                 track={track}
                 isSelected={selectedTrack === track.id}
                 onSelect={() => setSelectedTrack(track.id)}
-                onVolumeChange={(volume) => onTrackVolumeChange?.(track.id, volume)}
-                onPanChange={(pan) => onTrackPanChange?.(track.id, pan)}
-                onMuteToggle={() => onTrackMuteToggle?.(track.id)}
-                onSoloToggle={() => onTrackSoloToggle?.(track.id)}
+                onVolumeChange={(volume) => onUpdateTrack(track.id, { volume })}
+                onPanChange={(pan) => onUpdateTrack(track.id, { pan })}
+                onMuteToggle={() => onUpdateTrack(track.id, { muted: !track.muted })}
+                onSoloToggle={() => onUpdateTrack(track.id, { solo: !track.solo })}
                 onDelete={tracks.length > 1 ? () => onTrackDelete?.(track.id) : undefined}
               />
           ))}

@@ -198,7 +198,10 @@ export default function AudioEditor() {
 
     // Create audio engine track
     if (isInitialized) {
-      createTrackGain(newTrack.id, newTrack.volume, newTrack.pan);
+      createTrackGain(newTrack.id);
+      // Set initial volume and pan
+      setTrackVolume(newTrack.id, newTrack.volume);
+      setTrackPan(newTrack.id, newTrack.pan);
     }
   };
 
@@ -1480,17 +1483,15 @@ export default function AudioEditor() {
 
         <Timeline
           tracks={tracks}
-          onClipMove={handleClipMove}
-          onClipResize={handleClipResize}
-          onClipDelete={deleteClip}
-          onTrackVolumeChange={handleTrackVolumeChange}
-          onTrackPanChange={handleTrackPanChange}
-          onTrackMuteToggle={handleTrackMuteToggle}
-          onTrackSoloToggle={handleTrackSoloToggle}
-          onTrackDelete={deleteTrack}
-          playbackPosition={playbackState.currentTime}
-          zoomLevel={projectData.zoomLevel}
-          onSeek={seekTo}
+          playbackState={playbackState}
+          projectData={projectData}
+          onUpdateTrack={updateTrack}
+          onAddClipToTrack={addClipToTrack}
+          onUpdateClip={updateClip}
+          onDeleteClip={deleteClip}
+          formatTime={formatTime}
+          onUpdateProjectData={updateProjectData}
+          onSeekTo={seekTo}
           currentTool={currentTool}
           onSplitClip={splitClip}
           onCutRegion={cutRegion}
@@ -1513,6 +1514,7 @@ export default function AudioEditor() {
           isTTSGenerating={isTTSGenerating}
           ttsProgress={ttsProgress}
           getAudioBuffer={getAudioBuffer}
+          onTrackDelete={deleteTrack}
           data-testid="timeline"
         />
 
