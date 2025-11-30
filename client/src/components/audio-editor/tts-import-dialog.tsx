@@ -38,7 +38,12 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   const availableEmotions = TTSService.AVAILABLE_EMOTIONS;
   const emotionLabels = TTSService.EMOTION_LABELS;
 
-  const parseDialogText = (text: string): { speakers: string[], fragments: TTSTextFragment[] } => {
+  const parseDialogText = (
+    text: string, 
+    voiceMapping: Record<string, string>,
+    emotionMapping: Record<string, TTSEmotion>,
+    defaultEmotion: TTSEmotion
+  ): { speakers: string[], fragments: TTSTextFragment[] } => {
     const lines = text.split('\n').filter(line => line.trim());
     const speakers = new Set<string>();
     const fragments: TTSTextFragment[] = [];
@@ -51,8 +56,8 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         
         speakers.add(speaker);
         
-        const voiceId = speakerVoiceMapping[speaker] || availableVoices[0].id;
-        const emotion = speakerEmotionMapping[speaker] || globalEmotion;
+        const voiceId = voiceMapping[speaker] || availableVoices[0].id;
+        const emotion = emotionMapping[speaker] || defaultEmotion;
         
         fragments.push({
           id: `fragment-${index + 1}`,
@@ -76,7 +81,12 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
 
     if (text.trim()) {
       if (isDialogMode) {
-        const { speakers, fragments: dialogFragments } = parseDialogText(text);
+        const { speakers, fragments: dialogFragments } = parseDialogText(
+          text, 
+          speakerVoiceMapping, 
+          speakerEmotionMapping, 
+          globalEmotion
+        );
         setDetectedSpeakers(speakers);
         setFragments(dialogFragments);
       } else {
@@ -235,7 +245,33 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     }
     
     if (rawText.trim()) {
-      handleTextChange(rawText);
+      if (enabled) {
+        const { speakers, fragments: dialogFragments } = parseDialogText(
+          rawText, 
+          speakerVoiceMapping, 
+          speakerEmotionMapping, 
+          globalEmotion
+        );
+        setDetectedSpeakers(speakers);
+        setFragments(dialogFragments);
+      } else {
+        const textLines = TTSService.parseTextToFragments(rawText);
+        const newFragments: TTSTextFragment[] = textLines.map((line, index) => {
+          let voiceId = availableVoices[0].id;
+          if (isAlternatingVoices && alternatingVoice1 && alternatingVoice2) {
+            voiceId = index % 2 === 0 ? alternatingVoice1 : alternatingVoice2;
+          }
+          return {
+            id: `fragment-${index + 1}`,
+            text: line,
+            voiceId,
+            emotion: globalEmotion,
+            order: index
+          };
+        });
+        setFragments(newFragments);
+        setDetectedSpeakers([]);
+      }
     }
   };
 
