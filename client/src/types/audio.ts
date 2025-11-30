@@ -71,6 +71,8 @@ export interface Transcript {
 }
 
 // Text-to-Speech types
+export type TTSProvider = 'transkriptor' | 'openai';
+
 export type TTSEmotion = 
   | "Angry" 
   | "Calm" 
@@ -91,8 +93,9 @@ export interface TTSVoice {
   id: string;
   name: string;
   description: string;
-  gender: 'male' | 'female';
+  gender: 'male' | 'female' | 'neutral';
   language: string;
+  provider: TTSProvider;
 }
 
 export interface TTSTextFragment {
