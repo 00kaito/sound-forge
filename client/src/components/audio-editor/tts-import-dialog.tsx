@@ -1,5 +1,5 @@
-import { useState, useId } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState, useId, useMemo } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -7,14 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Play, User, Users, CheckSquare, Square, Volume2, Palette } from "lucide-react";
+import { Trash2, Play, User, Users, CheckSquare, Square, Volume2, Palette, Zap } from "lucide-react";
 import { TTSService } from "@/lib/tts-service";
-import type { TTSVoice, TTSTextFragment, TTSEmotion } from "@/types/audio";
+import type { TTSVoice, TTSTextFragment, TTSEmotion, TTSProvider } from "@/types/audio";
 
 interface TTSImportDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (fragments: TTSTextFragment[], voices: TTSVoice[]) => void;
+  onImport: (fragments: TTSTextFragment[], voices: TTSVoice[], provider: TTSProvider) => void;
 }
 
 export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogProps) {
@@ -32,11 +32,13 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   const [detectedSpeakers, setDetectedSpeakers] = useState<string[]>([]);
   const [speakerVoiceMapping, setSpeakerVoiceMapping] = useState<Record<string, string>>({});
   const [speakerEmotionMapping, setSpeakerEmotionMapping] = useState<Record<string, TTSEmotion>>({});
+  const [selectedProvider, setSelectedProvider] = useState<TTSProvider>("transkriptor");
   const dialogId = useId();
 
-  const availableVoices = TTSService.AVAILABLE_VOICES;
+  const availableVoices = useMemo(() => TTSService.getVoicesByProvider(selectedProvider), [selectedProvider]);
   const availableEmotions = TTSService.AVAILABLE_EMOTIONS;
   const emotionLabels = TTSService.EMOTION_LABELS;
+  const isOpenAI = selectedProvider === 'openai';
 
   const parseDialogText = (
     text: string, 
@@ -312,6 +314,17 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     setDetectedSpeakers([]);
     setSpeakerVoiceMapping({});
     setSpeakerEmotionMapping({});
+    setSelectedProvider("transkriptor");
+  };
+
+  const handleProviderChange = (provider: TTSProvider) => {
+    setSelectedProvider(provider);
+    setFragments([]);
+    setRawText("");
+    setAlternatingVoice1("");
+    setAlternatingVoice2("");
+    setSpeakerVoiceMapping({});
+    setDetectedSpeakers([]);
   };
 
   const handleImport = () => {
@@ -327,19 +340,55 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
       }
     });
 
-    onImport(fragments, usedVoices);
+    onImport(fragments, usedVoices, selectedProvider);
     resetForm();
     onClose();
+  };
+
+  const getGenderLabel = (gender: 'male' | 'female' | 'neutral') => {
+    switch (gender) {
+      case 'male': return 'M';
+      case 'female': return 'K';
+      case 'neutral': return 'N';
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import tekstu do TTS (Transkriptor)</DialogTitle>
+          <DialogTitle>Import tekstu do TTS</DialogTitle>
+          <DialogDescription>
+            Wybierz dostawcę TTS i wklej tekst do wygenerowania
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">
+          <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Dostawca TTS:</Label>
+            </div>
+            <Select value={selectedProvider} onValueChange={(v) => handleProviderChange(v as TTSProvider)}>
+              <SelectTrigger className="w-48" data-testid="select-tts-provider">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="transkriptor">
+                  Transkriptor (27 głosów PL)
+                </SelectItem>
+                <SelectItem value="openai">
+                  OpenAI TTS (6 głosów, wielojęzyczne)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {isOpenAI && (
+              <Badge variant="outline" className="text-xs">
+                Wymaga klucza OpenAI API
+              </Badge>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor={`${dialogId}-text`}>Wklej tekst do wygenerowania</Label>
             <Textarea
@@ -370,22 +419,24 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
               <Label htmlFor={`${dialogId}-dialog-mode`}>Tryb dialogu (imię: tekst)</Label>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Palette className="w-4 h-4 text-muted-foreground" />
-              <Label className="text-sm">Globalny styl:</Label>
-              <Select value={globalEmotion} onValueChange={(v) => handleGlobalEmotionChange(v as TTSEmotion)}>
-                <SelectTrigger className="w-40" data-testid="select-global-emotion">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableEmotions.map((emotion) => (
-                    <SelectItem key={emotion} value={emotion}>
-                      {emotionLabels[emotion]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!isOpenAI && (
+              <div className="flex items-center gap-2">
+                <Palette className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-sm">Globalny styl:</Label>
+                <Select value={globalEmotion} onValueChange={(v) => handleGlobalEmotionChange(v as TTSEmotion)}>
+                  <SelectTrigger className="w-40" data-testid="select-global-emotion">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableEmotions.map((emotion) => (
+                      <SelectItem key={emotion} value={emotion}>
+                        {emotionLabels[emotion]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {isDialogMode && (
@@ -416,26 +467,28 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                       <SelectContent>
                         {availableVoices.map((voice) => (
                           <SelectItem key={voice.id} value={voice.id}>
-                            {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
+                            {voice.name} ({getGenderLabel(voice.gender)})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Select 
-                      value={speakerEmotionMapping[speaker] || globalEmotion} 
-                      onValueChange={(emotion) => updateSpeakerEmotion(speaker, emotion as TTSEmotion)}
-                    >
-                      <SelectTrigger className="w-40" data-testid={`select-speaker-emotion-${speaker}`}>
-                        <SelectValue placeholder="Styl" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableEmotions.map((emotion) => (
-                          <SelectItem key={emotion} value={emotion}>
-                            {emotionLabels[emotion]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {!isOpenAI && (
+                      <Select 
+                        value={speakerEmotionMapping[speaker] || globalEmotion} 
+                        onValueChange={(emotion) => updateSpeakerEmotion(speaker, emotion as TTSEmotion)}
+                      >
+                        <SelectTrigger className="w-40" data-testid={`select-speaker-emotion-${speaker}`}>
+                          <SelectValue placeholder="Styl" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableEmotions.map((emotion) => (
+                            <SelectItem key={emotion} value={emotion}>
+                              {emotionLabels[emotion]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 ))}
               </div>
@@ -471,7 +524,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         <SelectContent>
                           {availableVoices.map((voice) => (
                             <SelectItem key={voice.id} value={voice.id}>
-                              {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
+                              {voice.name} ({getGenderLabel(voice.gender)})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -489,7 +542,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         <SelectContent>
                           {availableVoices.map((voice) => (
                             <SelectItem key={voice.id} value={voice.id}>
-                              {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
+                              {voice.name} ({getGenderLabel(voice.gender)})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -510,7 +563,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                       <SelectContent>
                         {availableVoices.map((voice) => (
                           <SelectItem key={voice.id} value={voice.id}>
-                            {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
+                            {voice.name} ({getGenderLabel(voice.gender)})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -622,26 +675,28 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                               <SelectContent>
                                 {availableVoices.map((voice) => (
                                   <SelectItem key={voice.id} value={voice.id}>
-                                    {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
+                                    {voice.name} ({getGenderLabel(voice.gender)})
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Select 
-                              value={fragment.emotion} 
-                              onValueChange={(emotion) => updateFragmentEmotion(fragment.id, emotion as TTSEmotion)}
-                            >
-                              <SelectTrigger className="w-36" data-testid={`select-fragment-emotion-${fragment.id}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableEmotions.map((emotion) => (
-                                  <SelectItem key={emotion} value={emotion}>
-                                    {emotionLabels[emotion]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            {!isOpenAI && (
+                              <Select 
+                                value={fragment.emotion} 
+                                onValueChange={(emotion) => updateFragmentEmotion(fragment.id, emotion as TTSEmotion)}
+                              >
+                                <SelectTrigger className="w-36" data-testid={`select-fragment-emotion-${fragment.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableEmotions.map((emotion) => (
+                                    <SelectItem key={emotion} value={emotion}>
+                                      {emotionLabels[emotion]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
                             {voice && (
                               <Badge variant="outline" className="text-xs">
                                 ~{formatDuration(TTSService.estimateTotalDuration([fragment]))}
@@ -688,7 +743,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                             <User className="w-4 h-4" />
                             <span className="font-medium">{voice.name}</span>
                             <Badge variant="outline">
-                              {voice.gender === 'male' ? 'M' : 'K'}
+                              {getGenderLabel(voice.gender)}
                             </Badge>
                           </div>
                           <Badge variant="secondary">

@@ -12,7 +12,7 @@ import { EffectsModal } from '@/components/audio-editor/effects-modal';
 import { TTSImportDialog } from '@/components/audio-editor/tts-import-dialog';
 import { loadSRTFile } from '@/lib/transcript-parser';
 import { TTSService } from '@/lib/tts-service';
-import { Track, AudioClip, ProjectData, ExportSettings, Transcript, TranscriptSegment, TTSVoice, TTSTextFragment, TTSGenerationResult } from '@/types/audio';
+import { Track, AudioClip, ProjectData, ExportSettings, Transcript, TranscriptSegment, TTSVoice, TTSTextFragment, TTSGenerationResult, TTSProvider } from '@/types/audio';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AudioEditor() {
@@ -966,6 +966,7 @@ export default function AudioEditor() {
         id: `regen-${segmentId}-${Date.now()}`,
         text,
         voiceId,
+        emotion: "Conversational",
         order: 0
       };
 
@@ -1091,7 +1092,7 @@ export default function AudioEditor() {
   };
 
   // TTS Generation functionality
-  const handleTTSImport = async (fragments: TTSTextFragment[], voices: TTSVoice[]) => {
+  const handleTTSImport = async (fragments: TTSTextFragment[], voices: TTSVoice[], provider: TTSProvider = 'transkriptor') => {
     setIsTTSGenerating(true);
     setTTSProgress({ completed: 0, total: fragments.length });
 
@@ -1100,7 +1101,8 @@ export default function AudioEditor() {
       const results = await TTSService.generateAudioForFragments(
         fragments,
         voices,
-        (completed, total) => {
+        provider,
+        (completed: number, total: number) => {
           setTTSProgress({ completed, total });
         }
       );
