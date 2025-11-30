@@ -66,6 +66,17 @@ The schema includes tables for audio files (storing metadata like duration, file
 The current implementation includes session management infrastructure with connect-pg-simple for PostgreSQL session storage, though specific authentication mechanisms are not yet implemented. The architecture is prepared for user-based access control and project ownership management.
 
 ### External Service Integrations
+
+#### Transkriptor TTS API
+The application integrates with Transkriptor API for text-to-speech functionality:
+- **27 Polish voices** (Adrian, Alicja, Andrzej, Aneta, Artur, Beata, Dariusz, Dominika, Elżbieta, Ewa, Grzegorz, Joanna, Justyna, Maciej, Magdalena, Marcin, Mariusz, Małgorzata, Michał, Monika, Natalia, Paulina, Paweł, Piotr, Sebastian, Tomasz, Łukasz)
+- **14 emotion/style options** (Angry, Calm, Cheerful, Conversational, Dramatic, Emotional, Formal, Instructional, Narrative, Newcast, Promo, Robotic, Sorrowful, Terrified)
+- **Server-side API key management** - key stored in TRANSKRIPTOR_API_KEY environment variable
+- **Per-fragment voice and emotion control** - each text fragment can have different voice and style
+- **Dialog mode** - automatic speaker detection for "Name: text" format with per-speaker voice/emotion assignment
+- **Global emotion setting** - apply same style to all fragments at once
+
+#### Neon Database
 The application integrates with Neon Database as the primary PostgreSQL provider for production deployments. The database connection is configured through environment variables for secure credential management. The system includes error handling and connection validation to ensure robust database connectivity.
 
 Development tools include Replit-specific plugins for enhanced development experience, including runtime error overlays and cartographer integration for debugging. The Vite configuration includes hot module replacement and development-specific optimizations.
