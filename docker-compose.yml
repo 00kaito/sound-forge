@@ -9,7 +9,7 @@ services:
     container_name: audioforge-app
     restart: unless-stopped
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 5000
       # No database needed - using MemStorage (in-memory) + LocalAudioStorage (browser)
       SESSION_SECRET: your-super-secret-session-key-change-in-production

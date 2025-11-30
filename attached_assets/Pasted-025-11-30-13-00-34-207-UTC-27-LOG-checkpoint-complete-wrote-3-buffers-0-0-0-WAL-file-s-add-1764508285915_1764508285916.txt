@@ -1,0 +1,51 @@
+025-11-30 13:00:34.207 UTC [27] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.004 s, sync=0.002 s, total=0.014 s; sync files=2, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=0 kB
+audioforge-app  |     at async loadESM (node:internal/process/esm_loader:34:7)
+audioforge-app  |     at async handleMainPromise (node:internal/modules/run_main:106:12) {
+audioforge-app  |   code: 'ERR_INVALID_ARG_TYPE'
+audioforge-app  | }
+audioforge-app  | 
+audioforge-app  | Node.js v18.20.8
+audioforge-app  | 
+audioforge-app  | > rest-express@1.0.0 dev
+audioforge-app  | > NODE_ENV=development tsx server/index.ts
+audioforge-app  | 
+audioforge-app  | node:internal/errors:496
+audioforge-app  |     ErrorCaptureStackTrace(err);
+audioforge-app  |     ^
+audioforge-app  | 
+audioforge-app  | TypeError [ERR_INVALID_ARG_TYPE]: The "paths[0]" argument must be of type string. Received undefined
+audioforge-app  |     at __node_internal_captureLargerStackTrace (node:internal/errors:496:5)
+audioforge-app  |     at new NodeError (node:internal/errors:405:5)
+audioforge-app  |     at validateString (node:internal/validators:162:11)
+audioforge-app  |     at Object.resolve (node:path:1115:7)
+audioforge-app  |     at <anonymous> (/app/vite.config.ts:21:17)
+audioforge-app  |     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+audioforge-app  |     at async ModuleLoader.import (node:internal/modules/esm/loader:337:24)
+audioforge-app  |     at async loadESM (node:internal/process/esm_loader:34:7)
+audioforge-app  |     at async handleMainPromise (node:internal/modules/run_main:106:12) {
+audioforge-app  |   code: 'ERR_INVALID_ARG_TYPE'
+audioforge-app  | }
+audioforge-app  | 
+audioforge-app  | Node.js v18.20.8
+audioforge-app  | 
+audioforge-app  | > rest-express@1.0.0 dev
+audioforge-app  | > NODE_ENV=development tsx server/index.ts
+audioforge-app  | 
+audioforge-app  | node:internal/errors:496
+audioforge-app  |     ErrorCaptureStackTrace(err);
+audioforge-app  |     ^
+audioforge-app  | 
+audioforge-app  | TypeError [ERR_INVALID_ARG_TYPE]: The "paths[0]" argument must be of type string. Received undefined
+audioforge-app  |     at __node_internal_captureLargerStackTrace (node:internal/errors:496:5)
+audioforge-app  |     at new NodeError (node:internal/errors:405:5)
+audioforge-app  |     at validateString (node:internal/validators:162:11)
+audioforge-app  |     at Object.resolve (node:path:1115:7)
+audioforge-app  |     at <anonymous> (/app/vite.config.ts:21:17)
+audioforge-app  |     at ModuleJob.run (node:internal/modules/esm/module_job:195:25)
+audioforge-app  |     at async ModuleLoader.import (node:internal/modules/esm/loader:337:24)
+audioforge-app  |     at async loadESM (node:internal/process/esm_loader:34:7)
+audioforge-app  |     at async handleMainPromise (node:internal/modules/run_main:106:12) {
+audioforge-app  |   code: 'ERR_INVALID_ARG_TYPE'
+audioforge-app  | }
+audioforge-app  | 
+audioforge-app  | Node.js v18.20.8
