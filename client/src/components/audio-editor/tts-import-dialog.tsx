@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Play, User, Users, CheckSquare, Square, Volume2 } from "lucide-react";
+import { Trash2, Play, User, Users, CheckSquare, Square, Volume2, Palette } from "lucide-react";
 import { TTSService } from "@/lib/tts-service";
-import type { TTSVoice, TTSTextFragment } from "@/types/audio";
+import type { TTSVoice, TTSTextFragment, TTSEmotion } from "@/types/audio";
 
 interface TTSImportDialogProps {
   isOpen: boolean;
@@ -23,17 +23,21 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
   const [selectedVoices, setSelectedVoices] = useState<Set<string>>(new Set());
   const [selectedFragments, setSelectedFragments] = useState<Set<string>>(new Set());
   const [bulkVoiceId, setBulkVoiceId] = useState<string>("");
+  const [bulkEmotion, setBulkEmotion] = useState<TTSEmotion>("Conversational");
+  const [globalEmotion, setGlobalEmotion] = useState<TTSEmotion>("Conversational");
   const [isAlternatingVoices, setIsAlternatingVoices] = useState<boolean>(false);
   const [alternatingVoice1, setAlternatingVoice1] = useState<string>("");
   const [alternatingVoice2, setAlternatingVoice2] = useState<string>("");
   const [isDialogMode, setIsDialogMode] = useState<boolean>(false);
   const [detectedSpeakers, setDetectedSpeakers] = useState<string[]>([]);
   const [speakerVoiceMapping, setSpeakerVoiceMapping] = useState<Record<string, string>>({});
+  const [speakerEmotionMapping, setSpeakerEmotionMapping] = useState<Record<string, TTSEmotion>>({});
   const dialogId = useId();
 
   const availableVoices = TTSService.AVAILABLE_VOICES;
+  const availableEmotions = TTSService.AVAILABLE_EMOTIONS;
+  const emotionLabels = TTSService.EMOTION_LABELS;
 
-  // Parse dialog text in format "name: text"
   const parseDialogText = (text: string): { speakers: string[], fragments: TTSTextFragment[] } => {
     const lines = text.split('\n').filter(line => line.trim());
     const speakers = new Set<string>();
@@ -48,11 +52,13 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         speakers.add(speaker);
         
         const voiceId = speakerVoiceMapping[speaker] || availableVoices[0].id;
+        const emotion = speakerEmotionMapping[speaker] || globalEmotion;
         
         fragments.push({
           id: `fragment-${index + 1}`,
           text,
           voiceId,
+          emotion,
           order: index,
           speaker
         });
@@ -65,7 +71,6 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     };
   };
 
-  // Parse text into fragments when text changes
   const handleTextChange = (text: string) => {
     setRawText(text);
 
@@ -77,9 +82,8 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
       } else {
         const textLines = TTSService.parseTextToFragments(text);
         const newFragments: TTSTextFragment[] = textLines.map((line, index) => {
-          let voiceId = availableVoices[0].id; // Default to first voice
+          let voiceId = availableVoices[0].id;
 
-          // Apply alternating voices if enabled
           if (isAlternatingVoices && alternatingVoice1 && alternatingVoice2) {
             voiceId = index % 2 === 0 ? alternatingVoice1 : alternatingVoice2;
           }
@@ -88,6 +92,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             id: `fragment-${index + 1}`,
             text: line,
             voiceId,
+            emotion: globalEmotion,
             order: index
           };
         });
@@ -99,7 +104,17 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     }
   };
 
-  // Re-apply voice assignment when alternating mode changes
+  const handleGlobalEmotionChange = (emotion: TTSEmotion) => {
+    setGlobalEmotion(emotion);
+    
+    if (fragments.length > 0) {
+      setFragments(prev => prev.map(fragment => ({
+        ...fragment,
+        emotion
+      })));
+    }
+  };
+
   const handleAlternatingModeChange = (enabled: boolean) => {
     setIsAlternatingVoices(enabled);
 
@@ -112,7 +127,6 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     }
   };
 
-  // Apply alternating voices when voices are selected
   const handleAlternatingVoicesUpdate = (voice1: string, voice2: string) => {
     setAlternatingVoice1(voice1);
     setAlternatingVoice2(voice2);
@@ -126,7 +140,6 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     }
   };
 
-  // Change all fragments of one voice to another
   const changeAllVoicesOfType = (fromVoiceId: string, toVoiceId: string) => {
     setFragments(prev => prev.map(fragment => 
       fragment.voiceId === fromVoiceId 
@@ -134,13 +147,11 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         : fragment
     ));
 
-    // Track which voices are being used
     const updatedVoices = new Set(selectedVoices);
     updatedVoices.add(toVoiceId);
     setSelectedVoices(updatedVoices);
   };
 
-  // Update voice for a specific fragment
   const updateFragmentVoice = (fragmentId: string, voiceId: string) => {
     setFragments(prev => prev.map(fragment => 
       fragment.id === fragmentId 
@@ -148,13 +159,19 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
         : fragment
     ));
 
-    // Track which voices are being used
     const updatedVoices = new Set(selectedVoices);
     updatedVoices.add(voiceId);
     setSelectedVoices(updatedVoices);
   };
 
-  // Delete selected fragments
+  const updateFragmentEmotion = (fragmentId: string, emotion: TTSEmotion) => {
+    setFragments(prev => prev.map(fragment => 
+      fragment.id === fragmentId 
+        ? { ...fragment, emotion }
+        : fragment
+    ));
+  };
+
   const deleteSelectedFragments = () => {
     setFragments(prev => prev.filter(fragment => 
       !selectedFragments.has(fragment.id)
@@ -162,7 +179,6 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     setSelectedFragments(new Set());
   };
 
-  // Toggle fragment selection
   const toggleFragmentSelection = (fragmentId: string) => {
     const newSelection = new Set(selectedFragments);
     if (newSelection.has(fragmentId)) {
@@ -173,16 +189,14 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     setSelectedFragments(newSelection);
   };
 
-  // Select all fragments
   const selectAllFragments = () => {
     if (selectedFragments.size === fragments.length) {
-      setSelectedFragments(new Set()); // Deselect all if all are selected
+      setSelectedFragments(new Set());
     } else {
-      setSelectedFragments(new Set(fragments.map(f => f.id))); // Select all
+      setSelectedFragments(new Set(fragments.map(f => f.id)));
     }
   };
 
-  // Apply bulk voice assignment
   const applyBulkVoice = () => {
     if (!bulkVoiceId) return;
 
@@ -196,39 +210,39 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     setBulkVoiceId("");
   };
 
-  // Get voice by ID
+  const applyBulkEmotion = () => {
+    setFragments(prev => prev.map(fragment => ({
+      ...fragment,
+      emotion: bulkEmotion
+    })));
+  };
+
   const getVoiceById = (voiceId: string): TTSVoice | undefined => {
     return availableVoices.find(voice => voice.id === voiceId);
   };
 
-  // Format duration in minutes and seconds
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.round(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  // Handle dialog mode change
   const handleDialogModeChange = (enabled: boolean) => {
     setIsDialogMode(enabled);
     
-    // Clear alternating voices when switching to dialog mode
     if (enabled) {
       setIsAlternatingVoices(false);
     }
     
-    // Re-parse the text with the new mode
     if (rawText.trim()) {
       handleTextChange(rawText);
     }
   };
 
-  // Update speaker voice mapping
   const updateSpeakerVoice = (speaker: string, voiceId: string) => {
     const newMapping = { ...speakerVoiceMapping, [speaker]: voiceId };
     setSpeakerVoiceMapping(newMapping);
     
-    // Update fragments with the new voice assignment
     setFragments(prev => prev.map(fragment => 
       fragment.speaker === speaker 
         ? { ...fragment, voiceId }
@@ -236,26 +250,37 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     ));
   };
 
-  // Reset form
+  const updateSpeakerEmotion = (speaker: string, emotion: TTSEmotion) => {
+    const newMapping = { ...speakerEmotionMapping, [speaker]: emotion };
+    setSpeakerEmotionMapping(newMapping);
+    
+    setFragments(prev => prev.map(fragment => 
+      fragment.speaker === speaker 
+        ? { ...fragment, emotion }
+        : fragment
+    ));
+  };
+
   const resetForm = () => {
     setRawText("");
     setFragments([]);
     setSelectedVoices(new Set());
     setSelectedFragments(new Set());
     setBulkVoiceId("");
+    setBulkEmotion("Conversational");
+    setGlobalEmotion("Conversational");
     setIsAlternatingVoices(false);
     setAlternatingVoice1("");
     setAlternatingVoice2("");
     setIsDialogMode(false);
     setDetectedSpeakers([]);
     setSpeakerVoiceMapping({});
+    setSpeakerEmotionMapping({});
   };
 
-  // Handle import
   const handleImport = () => {
     if (fragments.length === 0) return;
 
-    // Get unique voices used in fragments
     const usedVoices: TTSVoice[] = [];
     const usedVoiceIds = new Set(fragments.map(f => f.voiceId));
     
@@ -275,11 +300,10 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import tekstu do TTS</DialogTitle>
+          <DialogTitle>Import tekstu do TTS (Transkriptor)</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Text Input */}
           <div className="space-y-2">
             <Label htmlFor={`${dialogId}-text`}>Wklej tekst do wygenerowania</Label>
             <Textarea
@@ -299,8 +323,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             )}
           </div>
 
-          {/* Dialog Mode Toggle */}
-          <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center space-x-2">
               <Checkbox 
                 id={`${dialogId}-dialog-mode`}
@@ -310,37 +333,69 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
               />
               <Label htmlFor={`${dialogId}-dialog-mode`}>Tryb dialogu (imię: tekst)</Label>
             </div>
-            {isDialogMode && (
-              <p className="text-xs text-muted-foreground pl-6">
-                Wprowadź tekst w formacie "Imię: tekst" w każdej linii. Głosy zostaną automatycznie przypisane do wykrytych mówców.
-              </p>
-            )}
+
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-muted-foreground" />
+              <Label className="text-sm">Globalny styl:</Label>
+              <Select value={globalEmotion} onValueChange={(v) => handleGlobalEmotionChange(v as TTSEmotion)}>
+                <SelectTrigger className="w-40" data-testid="select-global-emotion">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableEmotions.map((emotion) => (
+                    <SelectItem key={emotion} value={emotion}>
+                      {emotionLabels[emotion]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Speaker Voice Assignment for Dialog Mode */}
+          {isDialogMode && (
+            <p className="text-xs text-muted-foreground">
+              Wprowadź tekst w formacie "Imię: tekst" w każdej linii. Głosy i style zostaną automatycznie przypisane do wykrytych mówców.
+            </p>
+          )}
+
           {isDialogMode && detectedSpeakers.length > 0 && (
             <div className="space-y-4 p-4 border rounded-lg">
               <h3 className="text-sm font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                Przypisz głosy do mówców
+                Przypisz głosy i style do mówców
               </h3>
               <div className="grid gap-3">
                 {detectedSpeakers.map((speaker) => (
-                  <div key={speaker} className="flex items-center gap-3">
-                    <div className="flex-1">
+                  <div key={speaker} className="flex flex-wrap items-center gap-3">
+                    <div className="w-24">
                       <Label className="text-sm font-medium">{speaker}</Label>
                     </div>
                     <Select 
                       value={speakerVoiceMapping[speaker] || ''} 
                       onValueChange={(voiceId) => updateSpeakerVoice(speaker, voiceId)}
                     >
-                      <SelectTrigger className="w-48" data-testid={`select-speaker-voice-${speaker}`}>
+                      <SelectTrigger className="w-40" data-testid={`select-speaker-voice-${speaker}`}>
                         <SelectValue placeholder="Wybierz głos" />
                       </SelectTrigger>
                       <SelectContent>
                         {availableVoices.map((voice) => (
                           <SelectItem key={voice.id} value={voice.id}>
-                            {voice.name} ({voice.gender})
+                            {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select 
+                      value={speakerEmotionMapping[speaker] || globalEmotion} 
+                      onValueChange={(emotion) => updateSpeakerEmotion(speaker, emotion as TTSEmotion)}
+                    >
+                      <SelectTrigger className="w-40" data-testid={`select-speaker-emotion-${speaker}`}>
+                        <SelectValue placeholder="Styl" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableEmotions.map((emotion) => (
+                          <SelectItem key={emotion} value={emotion}>
+                            {emotionLabels[emotion]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -351,12 +406,10 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             </div>
           )}
 
-          {/* Voice Assignment Controls */}
           {fragments.length > 0 && !isDialogMode && (
             <div className="space-y-4 p-4 border rounded-lg">
               <h3 className="text-sm font-medium">Przypisanie głosów</h3>
               
-              {/* Alternating Voices Option - only show in non-dialog mode */}
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <Checkbox 
@@ -382,7 +435,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         <SelectContent>
                           {availableVoices.map((voice) => (
                             <SelectItem key={voice.id} value={voice.id}>
-                              {voice.name} ({voice.gender})
+                              {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -400,7 +453,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                         <SelectContent>
                           {availableVoices.map((voice) => (
                             <SelectItem key={voice.id} value={voice.id}>
-                              {voice.name} ({voice.gender})
+                              {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -410,10 +463,9 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                 )}
               </div>
 
-              {/* Bulk Voice Assignment - only show in non-dialog mode */}
               {!isAlternatingVoices && (
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 space-y-2">
+                <div className="flex flex-wrap gap-2 items-end">
+                  <div className="flex-1 min-w-[150px] space-y-2">
                     <Label>Przypisz jeden głos do wszystkich</Label>
                     <Select value={bulkVoiceId} onValueChange={setBulkVoiceId}>
                       <SelectTrigger data-testid="select-bulk-voice">
@@ -422,7 +474,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                       <SelectContent>
                         {availableVoices.map((voice) => (
                           <SelectItem key={voice.id} value={voice.id}>
-                            {voice.name} ({voice.gender})
+                            {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -433,19 +485,42 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                     disabled={!bulkVoiceId}
                     data-testid="button-apply-bulk-voice"
                   >
-                    Zastosuj
+                    Zastosuj głos
                   </Button>
                 </div>
               )}
+
+              <div className="flex flex-wrap gap-2 items-end">
+                <div className="flex-1 min-w-[150px] space-y-2">
+                  <Label>Przypisz jeden styl do wszystkich</Label>
+                  <Select value={bulkEmotion} onValueChange={(v) => setBulkEmotion(v as TTSEmotion)}>
+                    <SelectTrigger data-testid="select-bulk-emotion">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableEmotions.map((emotion) => (
+                        <SelectItem key={emotion} value={emotion}>
+                          {emotionLabels[emotion]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  onClick={applyBulkEmotion}
+                  data-testid="button-apply-bulk-emotion"
+                >
+                  Zastosuj styl
+                </Button>
+              </div>
             </div>
           )}
 
-          {/* Fragment List */}
           {fragments.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">Fragmenty ({fragments.length})</h3>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -455,12 +530,12 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                     {selectedFragments.size === fragments.length ? (
                       <>
                         <Square className="w-4 h-4 mr-1" />
-                        Odznacz wszystko
+                        Odznacz
                       </>
                     ) : (
                       <>
                         <CheckSquare className="w-4 h-4 mr-1" />
-                        Zaznacz wszystko
+                        Zaznacz
                       </>
                     )}
                   </Button>
@@ -472,7 +547,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                       data-testid="button-delete-selected"
                     >
                       <Trash2 className="w-4 h-4 mr-1" />
-                      Usuń zaznaczone ({selectedFragments.size})
+                      Usuń ({selectedFragments.size})
                     </Button>
                   )}
                 </div>
@@ -484,7 +559,7 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                   return (
                     <Card 
                       key={fragment.id} 
-                      className={`p-3 ${selectedFragments.has(fragment.id) ? 'ring-2 ring-blue-500' : ''}`}
+                      className={`p-3 ${selectedFragments.has(fragment.id) ? 'ring-2 ring-primary' : ''}`}
                     >
                       <div className="flex items-start gap-3">
                         <Checkbox
@@ -496,22 +571,37 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                           <p className="text-sm text-muted-foreground mb-1">
                             Fragment {fragment.order + 1}
                             {fragment.speaker && (
-                              <span className="ml-2 text-blue-600 font-medium">({fragment.speaker})</span>
+                              <span className="ml-2 font-medium">({fragment.speaker})</span>
                             )}
                           </p>
                           <p className="text-sm mb-2 break-words">{fragment.text}</p>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Select 
                               value={fragment.voiceId} 
                               onValueChange={(voiceId) => updateFragmentVoice(fragment.id, voiceId)}
                             >
-                              <SelectTrigger className="w-48" data-testid={`select-fragment-voice-${fragment.id}`}>
+                              <SelectTrigger className="w-36" data-testid={`select-fragment-voice-${fragment.id}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {availableVoices.map((voice) => (
                                   <SelectItem key={voice.id} value={voice.id}>
-                                    {voice.name} ({voice.gender})
+                                    {voice.name} ({voice.gender === 'male' ? 'M' : 'K'})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select 
+                              value={fragment.emotion} 
+                              onValueChange={(emotion) => updateFragmentEmotion(fragment.id, emotion as TTSEmotion)}
+                            >
+                              <SelectTrigger className="w-36" data-testid={`select-fragment-emotion-${fragment.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableEmotions.map((emotion) => (
+                                  <SelectItem key={emotion} value={emotion}>
+                                    {emotionLabels[emotion]}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -531,7 +621,6 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             </div>
           )}
 
-          {/* Summary */}
           {fragments.length > 0 && (
             <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
               <h3 className="text-sm font-medium flex items-center gap-2">
@@ -549,7 +638,6 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                 </div>
               </div>
               
-              {/* Voices Used */}
               <div className="space-y-2">
                 <span className="text-sm text-muted-foreground">Używane głosy:</span>
                 <div className="space-y-1">
@@ -559,18 +647,20 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
                     if (!voice) return null;
                     return (
                       <Card key={voiceId} className="p-2">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4" />
                             <span className="font-medium">{voice.name}</span>
-                            <Badge variant="outline">{voice.gender}</Badge>
+                            <Badge variant="outline">
+                              {voice.gender === 'male' ? 'M' : 'K'}
+                            </Badge>
                           </div>
                           <Badge variant="secondary">
-                            {voiceFragments.length} fragmentów
+                            {voiceFragments.length} frag.
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Szacowany czas: {formatDuration(TTSService.estimateTotalDuration(voiceFragments))}
+                          Czas: {formatDuration(TTSService.estimateTotalDuration(voiceFragments))}
                         </p>
                       </Card>
                     );
@@ -580,19 +670,16 @@ export function TTSImportDialog({ isOpen, onClose, onImport }: TTSImportDialogPr
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={onClose} data-testid="button-cancel">
+          <div className="flex justify-between gap-2">
+            <Button variant="outline" onClick={() => { resetForm(); onClose(); }} data-testid="button-cancel">
               Anuluj
             </Button>
-
             <Button 
-              onClick={handleImport}
+              onClick={handleImport} 
               disabled={fragments.length === 0}
-              data-testid="button-import-tts"
+              data-testid="button-import"
             >
-              <Play className="w-4 h-4 mr-2" />
-              Generuj audio ({fragments.length} fragmentów)
+              Importuj ({fragments.length} fragmentów)
             </Button>
           </div>
         </div>
