@@ -28,7 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log("TTS Request:", { text: text.substring(0, 50), voice_name, emotion });
+      console.log("TTS [Transkriptor] Request:", { text: text.substring(0, 50), voice_name, emotion });
 
       const response = await fetch("https://api.tor.app/developer/text_to_speech", {
         method: "POST",
@@ -77,9 +77,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.send(Buffer.from(audioBuffer));
 
     } catch (error) {
-      console.error("TTS generation error:", error);
+      console.error("TTS [Transkriptor] generation error:", error);
       res.status(500).json({ 
         message: "Nie udało się wygenerować audio",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // OpenAI TTS endpoint
+  app.post("/api/tts/generate/openai", async (req, res) => {
+    try {
+      const apiKey = process.env.OPENAI_API_KEY;
+      
+      if (!apiKey) {
+        return res.status(500).json({ 
+          message: "Klucz API OpenAI nie został skonfigurowany. Dodaj OPENAI_API_KEY w ustawieniach." 
+        });
+      }
+
+      const { text, voice = 'alloy', model = 'tts-1' } = req.body;
+
+      if (!text) {
+        return res.status(400).json({ 
+          message: "Brakuje wymaganego parametru: text" 
+        });
+      }
+
+      console.log("TTS [OpenAI] Request:", { text: text.substring(0, 50), voice, model });
+
+      const response = await fetch("https://api.openai.com/v1/audio/speech", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          input: text,
+          voice,
+          response_format: "mp3"
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+        console.error("OpenAI API error:", errorData);
+        return res.status(response.status).json({ 
+          message: `Błąd API OpenAI: ${errorData.error?.message || response.statusText}`
+        });
+      }
+
+      const audioBuffer = await response.arrayBuffer();
+      
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Length', audioBuffer.byteLength);
+      res.send(Buffer.from(audioBuffer));
+
+    } catch (error) {
+      console.error("TTS [OpenAI] generation error:", error);
+      res.status(500).json({ 
+        message: "Nie udało się wygenerować audio przez OpenAI",
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
