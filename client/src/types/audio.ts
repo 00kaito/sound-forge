@@ -71,6 +71,22 @@ export interface Transcript {
 }
 
 // Text-to-Speech types
+export type TTSEmotion = 
+  | "Angry" 
+  | "Calm" 
+  | "Cheerful" 
+  | "Conversational" 
+  | "Dramatic" 
+  | "Emotional" 
+  | "Formal" 
+  | "Instructional" 
+  | "Narrative" 
+  | "Newcast" 
+  | "Promo" 
+  | "Robotic" 
+  | "Sorrowful" 
+  | "Terrified";
+
 export interface TTSVoice {
   id: string;
   name: string;
@@ -83,6 +99,7 @@ export interface TTSTextFragment {
   id: string;
   text: string;
   voiceId: string;
+  emotion: TTSEmotion;
   order: number;
   speaker?: string;
 }
