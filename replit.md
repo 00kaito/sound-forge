@@ -67,14 +67,31 @@ The current implementation includes session management infrastructure with conne
 
 ### External Service Integrations
 
-#### Transkriptor TTS API
-The application integrates with Transkriptor API for text-to-speech functionality:
+#### Dual TTS Provider Support
+The application supports two Text-to-Speech providers with user-selectable choice during import:
+
+**Transkriptor TTS API** (Default)
 - **27 Polish voices** (Adrian, Alicja, Andrzej, Aneta, Artur, Beata, Dariusz, Dominika, Elżbieta, Ewa, Grzegorz, Joanna, Justyna, Maciej, Magdalena, Marcin, Mariusz, Małgorzata, Michał, Monika, Natalia, Paulina, Paweł, Piotr, Sebastian, Tomasz, Łukasz)
 - **14 emotion/style options** (Angry, Calm, Cheerful, Conversational, Dramatic, Emotional, Formal, Instructional, Narrative, Newcast, Promo, Robotic, Sorrowful, Terrified)
 - **Server-side API key management** - key stored in TRANSKRIPTOR_API_KEY environment variable
 - **Per-fragment voice and emotion control** - each text fragment can have different voice and style
 - **Dialog mode** - automatic speaker detection for "Name: text" format with per-speaker voice/emotion assignment
 - **Global emotion setting** - apply same style to all fragments at once
+- **Retry logic** - exponential backoff (3 attempts, 2s/4s/6s delays) for API failures
+- **Rate limiting** - 2-second delay between fragment requests
+
+**OpenAI TTS API**
+- **6 voices** (alloy, echo, fable, onyx, nova, shimmer) - 3 male, 2 female, 1 neutral
+- **No emotion support** - UI hides emotion selectors when OpenAI is selected
+- **Server-side API key management** - key stored in OPENAI_API_KEY environment variable
+- **High-quality output** - uses tts-1-hd model
+- **MP3 format** - standard audio format for compatibility
+
+**TTS Implementation Details**
+- Provider selection in TTS Import dialog at top of form
+- Voice lists dynamically switch based on selected provider
+- Gender labels: M (male), K (female), N (neutral - OpenAI only)
+- Backend endpoints: `/api/tts/generate` (Transkriptor), `/api/tts/generate/openai` (OpenAI)
 
 #### Neon Database
 The application integrates with Neon Database as the primary PostgreSQL provider for production deployments. The database connection is configured through environment variables for secure credential management. The system includes error handling and connection validation to ensure robust database connectivity.
