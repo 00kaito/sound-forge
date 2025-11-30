@@ -28,19 +28,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const response = await fetch("https://api.transkriptor.com/text-to-speech", {
+      console.log("TTS Request:", { text: text.substring(0, 50), voice_name, emotion });
+
+      const response = await fetch("https://api.tor.app/developer/text_to_speech", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Accept": "application/json"
         },
         body: JSON.stringify({
           text,
           language: "pl-PL",
-          voice_name,
-          emotion: emotion || "Conversational",
-          speed_rate,
-          generate_subtitle: false
+          voice_name
         })
       });
 
@@ -48,11 +48,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const errorText = await response.text();
         console.error("Transkriptor API error:", errorText);
         return res.status(response.status).json({ 
-          message: `Błąd API Transkriptor: ${response.statusText}` 
+          message: `Błąd API Transkriptor: ${response.statusText}`,
+          details: errorText
         });
       }
 
-      const audioBuffer = await response.arrayBuffer();
+      const responseData = await response.json();
+      console.log("Transkriptor response:", responseData);
+
+      if (!responseData.audioUrl) {
+        return res.status(500).json({ 
+          message: "API nie zwróciło URL audio" 
+        });
+      }
+
+      const audioResponse = await fetch(responseData.audioUrl);
+      
+      if (!audioResponse.ok) {
+        return res.status(500).json({ 
+          message: "Nie udało się pobrać pliku audio" 
+        });
+      }
+
+      const audioBuffer = await audioResponse.arrayBuffer();
       
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Content-Length', audioBuffer.byteLength);
@@ -61,7 +79,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("TTS generation error:", error);
       res.status(500).json({ 
-        message: "Nie udało się wygenerować audio" 
+        message: "Nie udało się wygenerować audio",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });
