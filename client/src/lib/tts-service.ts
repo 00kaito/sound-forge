@@ -74,42 +74,65 @@ export class TTSService {
 
   static async generateAudioForFragment(
     fragment: TTSTextFragment,
-    voice: TTSVoice
+    voice: TTSVoice,
+    maxRetries: number = 3
   ): Promise<TTSGenerationResult> {
-    try {
-      const response = await fetch("/api/tts/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          text: fragment.text,
-          voice_name: voice.name,
-          emotion: fragment.emotion || "Conversational",
-          speed_rate: 1.0
-        })
-      });
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`TTS: Generowanie fragmentu "${fragment.text.substring(0, 30)}..." (próba ${attempt}/${maxRetries})`);
+        
+        const response = await fetch("/api/tts/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            text: fragment.text,
+            voice_name: voice.name,
+            emotion: fragment.emotion || "Conversational",
+            speed_rate: 1.0
+          })
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(errorData.message || "Błąd generowania audio");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: response.statusText }));
+          const errorMessage = errorData.message || "Błąd generowania audio";
+          
+          if (response.status >= 500 && attempt < maxRetries) {
+            console.warn(`TTS: Błąd serwera (${response.status}), ponawiam za ${attempt * 2} sekundy...`);
+            await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+            continue;
+          }
+          
+          throw new Error(errorMessage);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBlob = new Blob([arrayBuffer], { type: "audio/mpeg" });
+
+        const wordCount = fragment.text.split(' ').length;
+        const estimatedDuration = (wordCount / 150) * 60;
+
+        console.log(`TTS: Fragment wygenerowany pomyślnie`);
+        
+        return {
+          fragmentId: fragment.id,
+          audioBlob,
+          duration: estimatedDuration
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`TTS: Błąd próby ${attempt}:`, lastError.message);
+        
+        if (attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+        }
       }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBlob = new Blob([arrayBuffer], { type: "audio/mpeg" });
-
-      const wordCount = fragment.text.split(' ').length;
-      const estimatedDuration = (wordCount / 150) * 60;
-
-      return {
-        fragmentId: fragment.id,
-        audioBlob,
-        duration: estimatedDuration
-      };
-    } catch (error) {
-      console.error('TTS Generation error:', error);
-      throw new Error(`Nie udało się wygenerować audio dla fragmentu: ${fragment.text.substring(0, 50)}...`);
     }
+    
+    throw new Error(`Nie udało się wygenerować audio dla fragmentu: ${fragment.text.substring(0, 50)}...`);
   }
 
   static async generateAudioForFragments(
@@ -133,7 +156,8 @@ export class TTSService {
       onProgress?.(i + 1, fragments.length);
 
       if (i < fragments.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log(`TTS: Czekam 2 sekundy przed następnym fragmentem...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
 
